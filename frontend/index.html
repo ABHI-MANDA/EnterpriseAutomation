@@ -1,0 +1,1013 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Real Estate Enterprise Operations Command Center</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #111827;
+      --sidebar-bg: #0f172a;
+      --border: #1e293b;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --primary-glow: rgba(59, 130, 246, 0.25);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; font-size: 14px; }
+    
+    /* Layout */
+    .app-container { display: flex; height: 100vh; overflow: hidden; }
+    .sidebar { width: 260px; background: var(--sidebar-bg); border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: width 0.2s; z-index: 20; }
+    .sidebar.collapsed { width: 70px; }
+    .sidebar-header { padding: 18px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .logo-badge { background: linear-gradient(135deg, #2563eb, #1d4ed8); width: 34px; height: 34px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; color: #fff; box-shadow: 0 0 12px var(--primary-glow); }
+    .sidebar-title { font-size: 14px; font-weight: 700; letter-spacing: -0.2px; line-height: 1.2; }
+    .sidebar-subtitle { font-size: 11px; color: var(--text-dim); text-transform: uppercase; font-weight: 600; }
+    
+    .nav-list { list-style: none; padding: 12px 10px; flex: 1; overflow-y: auto; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 8px; color: var(--text-muted); cursor: pointer; transition: all 0.15s; margin-bottom: 4px; font-weight: 500; font-size: 13px; }
+    .nav-item:hover { background: rgba(255, 255, 255, 0.04); color: var(--text); }
+    .nav-item.active { background: var(--primary-glow); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); font-weight: 600; }
+    .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+    .main-wrapper { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    
+    /* Top Header */
+    .top-bar { height: 60px; background: var(--card-bg); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; gap: 16px; }
+    .search-box { position: relative; max-width: 320px; width: 100%; }
+    .search-box input { width: 100%; background: #0f172a; border: 1px solid var(--border); padding: 8px 12px 8px 34px; border-radius: 6px; color: var(--text); font-size: 13px; }
+    .search-box .search-icon { position: absolute; left: 10px; top: 9px; color: var(--text-dim); font-size: 13px; }
+
+    .header-actions { display: flex; align-items: center; gap: 12px; }
+    .badge { padding: 4px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; }
+    .badge-success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .badge-warning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-danger { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    /* Universal Filter Bar */
+    .filter-bar { background: #0f172a; border-bottom: 1px solid var(--border); padding: 10px 24px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .filter-group { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+    .filter-select { background: #1e293b; border: 1px solid #334155; color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 12px; outline: none; }
+    .filter-btn { padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; border: none; background: #334155; color: var(--text); }
+    .filter-btn.primary { background: var(--primary); color: #fff; }
+
+    /* Content Area */
+    .content-area { flex: 1; overflow-y: auto; padding: 24px; }
+    
+    /* Grid & Cards */
+    .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .kpi-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; position: relative; overflow: hidden; }
+    .kpi-card::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--primary); opacity: 0.8; }
+    .kpi-title { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+    .kpi-value { font-size: 26px; font-weight: 700; margin: 8px 0 4px; color: #fff; }
+    .kpi-sub { font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 4px; }
+
+    .charts-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 18px; margin-bottom: 24px; }
+    .chart-panel { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; }
+    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+    .panel-title { font-size: 14px; font-weight: 600; color: #fff; }
+
+    /* Data Tables */
+    .table-container { background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+    th { background: #0f172a; padding: 12px 14px; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+    td { padding: 12px 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); color: #cbd5e1; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: 0.15s; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+    .btn-outline:hover { background: #1e293b; color: #fff; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-danger { background: var(--danger); color: #fff; }
+
+    /* AI Assistant Drawer */
+    .ai-drawer { position: fixed; right: -420px; top: 0; bottom: 0; width: 400px; background: #0f172a; border-left: 1px solid var(--border); z-index: 50; display: flex; flex-direction: column; transition: right 0.25s ease; box-shadow: -10px 0 25px rgba(0,0,0,0.5); }
+    .ai-drawer.open { right: 0; }
+    .ai-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); }
+    .ai-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .chat-bubble { max-width: 85%; padding: 12px 14px; border-radius: 10px; font-size: 13px; line-height: 1.4; }
+    .chat-bubble.user { align-self: flex-end; background: var(--primary); color: #fff; border-bottom-right-radius: 2px; }
+    .chat-bubble.agent { align-self: flex-start; background: #1e293b; color: #e2e8f0; border-bottom-left-radius: 2px; border: 1px solid var(--border); }
+    .ai-evidence { background: #111827; border: 1px solid #334155; border-radius: 6px; padding: 10px; margin-top: 8px; font-size: 12px; }
+    .ai-input-bar { padding: 14px; border-top: 1px solid var(--border); display: flex; gap: 8px; background: var(--card-bg); }
+    .ai-input-bar input { flex: 1; background: #0b0f19; border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px; color: #fff; font-size: 13px; outline: none; }
+
+    /* Modals */
+    .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(2px); }
+    .modal-backdrop.active { display: flex; }
+    .modal-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; width: 90%; max-width: 640px; max-height: 85vh; overflow-y: auto; padding: 24px; box-shadow: 0 20px 40px rgba(0,0,0,0.6); }
+
+    /* Login Form Screen */
+    #login-view { position: fixed; inset: 0; background: #07090e; display: flex; align-items: center; justify-content: center; z-index: 999; }
+    .login-box { width: 360px; background: #111827; border: 1px solid var(--border); border-radius: 12px; padding: 32px 28px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+    .form-group input { width: 100%; background: #0b0f19; border: 1px solid var(--border); padding: 10px 12px; border-radius: 6px; color: #fff; font-size: 13px; }
+    .quick-account { font-size: 11px; color: #60a5fa; cursor: pointer; text-decoration: underline; margin-top: 6px; display: inline-block; }
+
+    /* Pulse dot */
+    .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; display: inline-block; box-shadow: 0 0 8px #10b981; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+  </style>
+</head>
+<body>
+
+  <!-- Sign In Screen -->
+  <div id="login-view">
+    <div class="login-box">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <div class="logo-badge">🏢</div>
+        <div>
+          <div style="font-weight:700;font-size:16px;">Real Estate Command</div>
+          <div style="font-size:11px;color:var(--text-dim);">Enterprise Operations Platform</div>
+        </div>
+      </div>
+      <form id="login-form">
+        <div class="form-group">
+          <label>Work Email</label>
+          <input type="email" id="login-email" value="admin@demo.local" required autocomplete="username" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="login-pass" value="AdminPass@2026" required autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label>TOTP Code (Optional)</label>
+          <input type="text" id="login-otp" placeholder="Leave empty if not enrolled" />
+        </div>
+        <div id="login-error" style="color:var(--danger);font-size:12px;margin-bottom:12px;display:none;"></div>
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;">Sign In to Command Center</button>
+      </form>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);font-size:11px;color:var(--text-dim);">
+        Quick Demo Logins:
+        <div><span class="quick-account" onclick="fillCreds('admin@demo.local')">Super Admin (Asha)</span> | <span class="quick-account" onclick="fillCreds('mgmt@demo.local')">Management (Meera)</span></div>
+        <div><span class="quick-account" onclick="fillCreds('south.mgr@demo.local')">South Mgr (Sanjay)</span> | <span class="quick-account" onclick="fillCreds('north.mgr@demo.local')">North Mgr (Nisha)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Application -->
+  <div class="app-container" id="app-view" style="display:none;">
+    
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="logo-badge">🏢</div>
+          <div>
+            <div class="sidebar-title">Real Estate</div>
+            <div class="sidebar-subtitle">Operations Hub</div>
+          </div>
+        </div>
+      </div>
+      <ul class="nav-list">
+        <li class="nav-item active" onclick="switchTab('overview')"><span class="nav-icon">📊</span> Overview</li>
+        <li class="nav-item" onclick="switchTab('records')"><span class="nav-icon">🔍</span> Record Explorer</li>
+        <li class="nav-item" onclick="switchTab('crm-ops')"><span class="nav-icon">⚡</span> CRM Operations</li>
+        <li class="nav-item" onclick="switchTab('sales-intel')"><span class="nav-icon">📈</span> Sales Intelligence</li>
+        <li class="nav-item" onclick="switchTab('team-ops')"><span class="nav-icon">👥</span> Team Capacity</li>
+        <li class="nav-item" onclick="switchTab('activity-feed')"><span class="nav-icon">📡</span> Live Activity</li>
+        <li class="nav-item" onclick="switchTab('crm-sync')"><span class="nav-icon">🔄</span> CRM Sync Health</li>
+        <li class="nav-item" onclick="switchTab('audit-sec')"><span class="nav-icon">🔒</span> Security & Audit</li>
+      </ul>
+      <div style="padding:16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div id="user-display-name" style="font-weight:600;font-size:12px;">Admin</div>
+          <div id="user-display-role" style="font-size:11px;color:var(--text-dim);">super_admin</div>
+        </div>
+        <button class="btn btn-outline" style="padding:4px 8px;font-size:11px;" onclick="signOut()">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-wrapper">
+      <!-- Top Bar -->
+      <div class="top-bar">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="global-search" placeholder="Search leads, projects, customers..." onkeyup="handleGlobalSearch(event)" />
+        </div>
+        <div class="header-actions">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);">
+            <span class="pulse-dot"></span> <span id="sync-pill-text">Live Sync: Active</span>
+          </div>
+          <button class="btn btn-outline" onclick="toggleAIDrawer()">🤖 Ask AI Agent</button>
+          <button class="btn btn-outline" onclick="exportLeadsCSV()">📥 Export CSV</button>
+        </div>
+      </div>
+
+      <!-- Universal Filters Bar -->
+      <div class="filter-bar">
+        <div class="filter-group">
+          <span>Region:</span>
+          <select class="filter-select" id="filter-region" onchange="applyGlobalFilters()">
+            <option value="">All Allowed</option>
+            <option value="South">South (Bengaluru)</option>
+            <option value="North">North (NCR)</option>
+            <option value="West">West (Mumbai)</option>
+            <option value="East">East (Kolkata)</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span>Stage:</span>
+          <select class="filter-select" id="filter-stage" onchange="applyGlobalFilters()">
+            <option value="">All Stages</option>
+            <option value="new">New</option>
+            <option value="contacted">Contacted</option>
+            <option value="qualified">Qualified</option>
+            <option value="negotiation">Negotiation</option>
+            <option value="won">Won</option>
+            <option value="lost">Lost</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span>Priority:</span>
+          <select class="filter-select" id="filter-priority" onchange="applyGlobalFilters()">
+            <option value="">All Priorities</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="normal">Normal</option>
+            <option value="low">Low</option>
+          </select>
+        </div>
+        <button class="filter-btn primary" onclick="applyGlobalFilters()">Apply Filter</button>
+        <button class="filter-btn" onclick="resetFilters()">Reset</button>
+      </div>
+
+      <!-- Viewports -->
+      <div class="content-area" id="main-content">
+        <!-- Dynamically rendered tab views -->
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Assistant Drawer -->
+  <div class="ai-drawer" id="ai-drawer">
+    <div class="ai-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">🤖</span>
+        <div>
+          <div style="font-weight:700;font-size:14px;">Master AI Orchestrator</div>
+          <div style="font-size:11px;color:var(--text-dim);">8 Governed Specialized Agents</div>
+        </div>
+      </div>
+      <button class="btn btn-outline" style="padding:4px 8px;" onclick="toggleAIDrawer()">✕</button>
+    </div>
+    <div class="ai-messages" id="ai-messages">
+      <div class="chat-bubble agent">
+        👋 Welcome to the Real Estate Command Center. I coordinate 8 specialized AI agents with authorized backend access.
+        <div style="margin-top:8px;font-size:11px;color:var(--text-dim);">
+          Try asking:
+          <br>• "Which project has the highest conversion rate?"
+          <br>• "Recommend executives for unassigned leads"
+          <br>• "Show all leads in South region"
+          <br>• "Identify employees with high workload"
+        </div>
+      </div>
+    </div>
+    <div class="ai-input-bar">
+      <input type="text" id="ai-input" placeholder="Type instruction or query..." onkeydown="if(event.key==='Enter') sendAIMessage()" />
+      <button class="btn btn-primary" onclick="sendAIMessage()">Send</button>
+    </div>
+  </div>
+
+  <!-- Allocation Preview & Approval Modal -->
+  <div class="modal-backdrop" id="allocation-modal">
+    <div class="modal-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <div>
+          <h3 style="font-size:16px;color:#fff;">Lead Allocation Preview & Approval</h3>
+          <div style="font-size:12px;color:var(--text-dim);" id="modal-batch-id">Batch ID: -</div>
+        </div>
+        <button class="btn btn-outline" onclick="closeAllocationModal()">✕</button>
+      </div>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">
+        The Workload Optimization Agent evaluated team capacity, regional match, and specialization to propose the following assignments.
+      </p>
+      <div class="table-container" style="margin-bottom:16px;">
+        <table id="allocation-table">
+          <thead>
+            <tr>
+              <th>Lead / Client</th>
+              <th>Region</th>
+              <th>Recommended Executive</th>
+              <th>Heuristic Reason</th>
+            </tr>
+          </thead>
+          <tbody id="allocation-tbody"></tbody>
+        </table>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;">
+        <button class="btn btn-outline" onclick="closeAllocationModal()">Reject Proposal</button>
+        <button class="btn btn-success" id="btn-approve-allocation" onclick="executeCurrentBatch()">Approve & Dispatch to CRM</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // State
+    let authToken = null;
+    let currentUser = null;
+    let currentTab = 'overview';
+    let globalFilters = { region: '', stage: '', priority: '' };
+    let currentBatchPreview = null;
+    let sseSource = null;
+
+    const $ = id => document.getElementById(id);
+
+    function fillCreds(email) {
+      $('login-email').value = email;
+      $('login-pass').value = 'AdminPass@2026';
+    }
+
+    // Auth
+    $('login-form').onsubmit = async (e) => {
+      e.preventDefault();
+      $('login-error').style.display = 'none';
+      try {
+        const res = await fetch('/api/v1/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: $('login-email').value,
+            password: $('login-pass').value,
+            otp: $('login-otp').value
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Authentication failed');
+
+        authToken = data.token;
+        currentUser = data.user;
+        $('login-view').style.display = 'none';
+        $('app-view').style.display = 'flex';
+        $('user-display-name').textContent = currentUser.name;
+        $('user-display-role').textContent = `${currentUser.role} (${currentUser.region || 'All'})`;
+
+        initSSE();
+        switchTab('overview');
+      } catch (err) {
+        $('login-error').textContent = err.message;
+        $('login-error').style.display = 'block';
+      }
+    };
+
+    function signOut() {
+      authToken = null;
+      currentUser = null;
+      if (sseSource) sseSource.close();
+      $('app-view').style.display = 'none';
+      $('login-view').style.display = 'flex';
+    }
+
+    async function apiRequest(path, options = {}) {
+      const headers = { 'Authorization': `Bearer ${authToken}`, ...(options.headers || {}) };
+      const res = await fetch(`/api/v1${path}`, { ...options, headers });
+      if (res.status === 401) { signOut(); throw new Error('Session expired'); }
+      return res;
+    }
+
+    // SSE Real-time Feed
+    function initSSE() {
+      if (sseSource) sseSource.close();
+      sseSource = new EventSource('/api/v1/events/stream');
+      sseSource.onmessage = (e) => {
+        try {
+          const ev = JSON.parse(e.data);
+          if (ev.event_type && ev.event_type !== 'stream.connected') {
+            onLiveEventReceived(ev);
+          }
+        } catch(err){}
+      };
+      sseSource.onerror = () => {
+        $('sync-pill-text').textContent = 'Live Sync: Reconnecting...';
+      };
+      sseSource.onopen = () => {
+        $('sync-pill-text').textContent = 'Live Sync: Active';
+      };
+    }
+
+    function onLiveEventReceived(event) {
+      if (currentTab === 'activity-feed') {
+        renderLiveFeed();
+      }
+    }
+
+    // Global Filter Handling
+    function applyGlobalFilters() {
+      globalFilters.region = $('filter-region').value;
+      globalFilters.stage = $('filter-stage').value;
+      globalFilters.priority = $('filter-priority').value;
+      renderCurrentTab();
+    }
+
+    function resetFilters() {
+      $('filter-region').value = '';
+      $('filter-stage').value = '';
+      $('filter-priority').value = '';
+      applyGlobalFilters();
+    }
+
+    function handleGlobalSearch(e) {
+      if (e.key === 'Enter') {
+        const query = $('global-search').value.trim();
+        if (query) {
+          switchTab('records', { search: query });
+        }
+      }
+    }
+
+    // Navigation
+    function switchTab(tab, extraState = {}) {
+      currentTab = tab;
+      document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+      const activeIdx = ['overview','records','crm-ops','sales-intel','team-ops','activity-feed','crm-sync','audit-sec'].indexOf(tab);
+      if (activeIdx >= 0) document.querySelectorAll('.nav-item')[activeIdx].classList.add('active');
+      renderCurrentTab(extraState);
+    }
+
+    function renderCurrentTab(extraState = {}) {
+      if (currentTab === 'overview') renderOverview();
+      else if (currentTab === 'records') renderRecords(extraState);
+      else if (currentTab === 'crm-ops') renderCRMOps();
+      else if (currentTab === 'sales-intel') renderSalesIntelligence();
+      else if (currentTab === 'team-ops') renderTeamCapacity();
+      else if (currentTab === 'activity-feed') renderLiveFeed();
+      else if (currentTab === 'crm-sync') renderCRMSync();
+      else if (currentTab === 'audit-sec') renderAuditSecurity();
+    }
+
+    // --- TAB 1: EXECUTIVE OVERVIEW ---
+    async function renderOverview() {
+      const container = $('main-content');
+      container.innerHTML = '<div style="padding:20px;color:var(--text-muted)">Loading executive intelligence...</div>';
+      
+      const q = globalFilters.region ? `?region=${globalFilters.region}` : '';
+      const res = await apiRequest(`/analytics/overview${q}`);
+      const data = await res.json();
+
+      container.innerHTML = `
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-title">Total Active Leads</div>
+            <div class="kpi-value">${data.active_leads} <span style="font-size:13px;color:var(--text-dim);">/ ${data.total_leads}</span></div>
+            <div class="kpi-sub">Conversion Rate: <b style="color:#60a5fa">${data.conversion_rate}%</b></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Active Projects</div>
+            <div class="kpi-value">${data.active_projects}</div>
+            <div class="kpi-sub">Available Units: <b>${data.available_units}</b></div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Pipeline Value</div>
+            <div class="kpi-value">₹${(data.total_pipeline_value / 10000000).toFixed(1)} Cr</div>
+            <div class="kpi-sub">Closed: ₹${(data.closed_revenue / 10000000).toFixed(1)} Cr</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Operations Attention</div>
+            <div class="kpi-value" style="color:${data.overdue_tasks > 0 ? '#f87171' : '#34d399'}">${data.overdue_tasks} Overdue</div>
+            <div class="kpi-sub">Pending Follow-ups: <b>${data.pending_followups}</b></div>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-panel">
+            <div class="panel-header">
+              <div class="panel-title">Operational Quick Actions</div>
+              <span class="badge badge-success">Automated Workflows</span>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap;padding:8px 0;">
+              <button class="btn btn-primary" onclick="switchTab('crm-ops')">⚡ Auto-Allocate Unassigned Leads</button>
+              <button class="btn btn-outline" onclick="triggerAIQuickPrompt('Which project has the highest conversion rate?')">📊 Analyze Top Conversions</button>
+              <button class="btn btn-outline" onclick="switchTab('records', { filterUnassigned: true })">🔍 View Unassigned Leads</button>
+              <button class="btn btn-outline" onclick="verifyAuditIntegrity()">🔒 Verify Audit Log Chain</button>
+            </div>
+          </div>
+
+          <div class="chart-panel">
+            <div class="panel-header">
+              <div class="panel-title">CRM Synchronization Pulse</div>
+              <span class="badge ${data.crm_sync_health === 'Healthy' ? 'badge-success' : 'badge-warning'}">${data.crm_sync_health}</span>
+            </div>
+            <div style="font-size:13px;line-height:1.6;color:var(--text-muted);">
+              <div>• Central PostgreSQL Schema: <b>Logical Partitioning & RLS Active</b></div>
+              <div>• CRM Outbox & Webhook Engine: <b>Bidirectional Sync Confirmed</b></div>
+              <div>• Security Events (7 Days): <b>${data.security_alerts_7d} Alerts</b></div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // --- TAB 2: UNIVERSAL RECORD EXPLORER ---
+    async function renderRecords(state = {}) {
+      const container = $('main-content');
+      container.innerHTML = '<div style="padding:20px;color:var(--text-muted)">Querying authorized records from central database...</div>';
+
+      let params = new URLSearchParams();
+      params.set('page', state.page || 1);
+      params.set('limit', 15);
+      if (globalFilters.region) params.set('region', globalFilters.region);
+      if (globalFilters.stage) params.set('status', globalFilters.stage);
+      if (globalFilters.priority) params.set('priority', globalFilters.priority);
+      if (state.search) params.set('search', state.search);
+      if (state.filterUnassigned) params.set('unassigned', 'true');
+
+      const res = await apiRequest(`/records/leads?${params.toString()}`);
+      const data = await res.json();
+
+      let rowsHtml = data.items.map(l => `
+        <tr>
+          <td><input type="checkbox" class="lead-select-cb" value="${l.id}" /></td>
+          <td><b>${l.customer_name}</b><br><span style="font-size:11px;color:var(--text-dim)">${l.customer_phone || ''}</span></td>
+          <td>${l.project_name}</td>
+          <td><span class="badge badge-success">${l.region}</span></td>
+          <td><span class="badge badge-outline">${l.status}</span></td>
+          <td>${l.priority === 'urgent' ? '<span class="badge badge-danger">Urgent</span>' : (l.priority === 'high' ? '<span class="badge badge-warning">High</span>' : l.priority)}</td>
+          <td>₹${(l.budget / 100000).toFixed(1)} Lakh</td>
+          <td>${l.assignee_name === 'Unassigned' ? '<span style="color:#f87171;font-weight:600">Unassigned</span>' : l.assignee_name}</td>
+          <td><button class="btn btn-outline" style="padding:4px 8px;font-size:11px" onclick="quickAssignSingle('${l.id}')">Assign</button></td>
+        </tr>
+      `).join('');
+
+      container.innerHTML = `
+        <div class="panel-header" style="margin-bottom:12px;">
+          <div>
+            <div class="panel-title">Centralized Database Records Explorer (Leads)</div>
+            <div style="font-size:12px;color:var(--text-dim);">Showing ${data.items.length} of ${data.total} records (Server-side paginated & RLS authorized)</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-primary" onclick="bulkAssignSelected()">⚡ Allocate Selected Leads</button>
+            <button class="btn btn-outline" onclick="exportLeadsCSV()">📥 Export Filtered CSV</button>
+          </div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th width="30"><input type="checkbox" onclick="toggleSelectAll(this)" /></th>
+                <th>Client</th>
+                <th>Project</th>
+                <th>Region</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Budget</th>
+                <th>Assigned Executive</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function toggleSelectAll(master) {
+      document.querySelectorAll('.lead-select-cb').forEach(cb => cb.checked = master.checked);
+    }
+
+    function getSelectedLeadIds() {
+      return Array.from(document.querySelectorAll('.lead-select-cb:checked')).map(cb => cb.value);
+    }
+
+    // --- TAB 3: CRM OPERATIONS CENTER ---
+    async function renderCRMOps() {
+      const container = $('main-content');
+      container.innerHTML = `
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">CRM Operations Center: Workload Optimization & Batch Allocation</div>
+            <div style="font-size:12px;color:var(--text-dim);">Evaluate capacity rules, review AI proposal, and execute verified assignments to the CRM</div>
+          </div>
+        </div>
+        <div class="chart-panel" style="margin-bottom:20px;">
+          <h4 style="margin-bottom:10px;color:#fff;">Automatic Lead Allocation Pipeline</h4>
+          <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">
+            The Workload Optimization Agent evaluates regional jurisdiction, active lead count, pending task backlogs, and project specialization to balance team assignments.
+          </p>
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-primary" onclick="triggerAutoAllocationPreview()">⚡ Generate Allocation Proposal for Unassigned Leads</button>
+            <button class="btn btn-outline" onclick="switchTab('records', { filterUnassigned: true })">Inspect Unassigned Queue</button>
+          </div>
+        </div>
+        <div id="crm-ops-status-area"></div>
+      `;
+    }
+
+    async function triggerAutoAllocationPreview() {
+      const q = globalFilters.region ? `?region=${globalFilters.region}&unassigned=true&limit=10` : `?unassigned=true&limit=10`;
+      const res = await apiRequest(`/records/leads${q}`);
+      const data = await res.json();
+      if (!data.items || data.items.length === 0) {
+        alert('No unassigned leads found in your authorized region.');
+        return;
+      }
+      const leadIds = data.items.map(l => l.id);
+      openAllocationPreviewModal(leadIds);
+    }
+
+    async function bulkAssignSelected() {
+      const ids = getSelectedLeadIds();
+      if (ids.length === 0) {
+        alert('Please select one or more leads using the checkboxes.');
+        return;
+      }
+      openAllocationPreviewModal(ids);
+    }
+
+    async function quickAssignSingle(leadId) {
+      openAllocationPreviewModal([leadId]);
+    }
+
+    async function openAllocationPreviewModal(leadIds) {
+      const res = await apiRequest('/crm-operations/assignments/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_ids: leadIds, strategy: 'auto_workload' })
+      });
+      const data = await res.json();
+      currentBatchPreview = data;
+
+      $('modal-batch-id').textContent = `Batch ID: ${data.batch_id} (${data.total_leads} leads evaluated)`;
+      const tbody = $('allocation-tbody');
+      tbody.innerHTML = data.allocations.map(a => `
+        <tr>
+          <td><b>${a.customer_name}</b><br><span style="font-size:11px;color:var(--text-dim)">${a.project_name}</span></td>
+          <td><span class="badge badge-success">${a.region}</span></td>
+          <td><b>${a.recommended_assignee_name}</b><br><span style="font-size:11px;color:var(--text-dim)">Workload: ${a.current_workload} leads</span></td>
+          <td><span style="font-size:12px;color:#93c5fd">${a.reason}</span></td>
+        </tr>
+      `).join('');
+
+      $('allocation-modal').classList.add('active');
+    }
+
+    function closeAllocationModal() {
+      $('allocation-modal').classList.remove('active');
+      currentBatchPreview = null;
+    }
+
+    async function executeCurrentBatch() {
+      if (!currentBatchPreview) return;
+      $('btn-approve-allocation').textContent = 'Executing...';
+      const res = await apiRequest('/crm-operations/assignments/execute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batch_id: currentBatchPreview.batch_id,
+          idempotency_key: `IDEMP-${currentBatchPreview.batch_id}`,
+          approved: true
+        })
+      });
+      const data = await res.json();
+      closeAllocationModal();
+      alert(`Batch executed: ${data.success_count} leads successfully assigned and dispatched to CRM.`);
+      renderCurrentTab();
+    }
+
+    // --- TAB 4: SALES INTELLIGENCE ---
+    async function renderSalesIntelligence() {
+      const container = $('main-content');
+      container.innerHTML = '<div style="padding:20px;color:var(--text-muted)">Calculating sales intelligence & conversion funnels...</div>';
+      const q = globalFilters.region ? `?region=${globalFilters.region}` : '';
+      const res = await apiRequest(`/analytics/sales${q}`);
+      const data = await res.json();
+
+      let stagesHtml = data.stages.map(s => `
+        <div style="margin-bottom:10px;">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;">
+            <span style="text-transform:uppercase;font-weight:600">${s.stage}</span>
+            <span>${s.count} leads (${s.percentage}%)</span>
+          </div>
+          <div style="background:#1e293b;height:8px;border-radius:4px;overflow:hidden;">
+            <div style="background:var(--primary);width:${s.percentage}%;height:100%;"></div>
+          </div>
+        </div>
+      `).join('');
+
+      let projectRows = data.project_performance.map(p => `
+        <tr>
+          <td><b>${p.project_name}</b></td>
+          <td><span class="badge badge-success">${p.region}</span></td>
+          <td>${p.leads_count}</td>
+          <td>${p.deals_count}</td>
+          <td><b>${p.conversion_rate}%</b></td>
+          <td>₹${(p.revenue / 10000000).toFixed(1)} Cr</td>
+        </tr>
+      `).join('');
+
+      container.innerHTML = `
+        <div class="charts-row">
+          <div class="chart-panel">
+            <div class="panel-header"><div class="panel-title">Sales Pipeline Funnel</div></div>
+            <div style="padding:10px 0;">${stagesHtml}</div>
+          </div>
+          <div class="chart-panel">
+            <div class="panel-header"><div class="panel-title">Lead Acquisition Channels</div></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:10px 0;">
+              ${data.sources.map(sc => `
+                <div style="background:#1e293b;padding:10px;border-radius:6px;">
+                  <div style="font-size:11px;color:var(--text-dim);">${sc.source}</div>
+                  <div style="font-size:18px;font-weight:700;color:#fff;">${sc.count}</div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <div style="padding:14px;border-bottom:1px solid var(--border);font-weight:600;">Project-Wise Conversion Performance</div>
+          <table>
+            <thead>
+              <tr><th>Project</th><th>Region</th><th>Total Leads</th><th>Closed Deals</th><th>Conversion Rate</th><th>Closed Revenue</th></tr>
+            </thead>
+            <tbody>${projectRows}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // --- TAB 5: TEAM OPERATIONS & WORKLOAD ---
+    async function renderTeamCapacity() {
+      const container = $('main-content');
+      container.innerHTML = '<div style="padding:20px;color:var(--text-muted)">Evaluating sales team workload distribution...</div>';
+      const q = globalFilters.region ? `?region=${globalFilters.region}` : '';
+      const res = await apiRequest(`/analytics/workload${q}`);
+      const data = await res.json();
+
+      let empRows = data.map(e => `
+        <tr>
+          <td><b>${e.name}</b><br><span style="font-size:11px;color:var(--text-dim)">${e.expertise || 'General'}</span></td>
+          <td><span class="badge badge-success">${e.region}</span></td>
+          <td>${e.assigned_leads}</td>
+          <td>${e.open_tasks}</td>
+          <td><span style="color:${e.overdue_tasks > 0 ? '#f87171' : 'inherit'}">${e.overdue_tasks}</span></td>
+          <td>${e.conversion_rate}%</td>
+          <td>${e.overloaded ? '<span class="badge badge-danger">Overloaded</span>' : '<span class="badge badge-success">Optimal</span>'}</td>
+        </tr>
+      `).join('');
+
+      container.innerHTML = `
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Employee Capacity & Task Compliance</div>
+            <div style="font-size:12px;color:var(--text-dim);">Live workload balancing meters (overload thresholds trigger reallocation recommendations)</div>
+          </div>
+        </div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr><th>Executive</th><th>Region</th><th>Assigned Leads</th><th>Open Tasks</th><th>Overdue Tasks</th><th>Conversion %</th><th>Status</th></tr>
+            </thead>
+            <tbody>${empRows}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // --- TAB 6: LIVE ACTIVITY MONITOR ---
+    async function renderLiveFeed() {
+      const container = $('main-content');
+      const res = await apiRequest('/events/history?limit=30');
+      const events = await res.json();
+
+      let feedHtml = events.map(ev => `
+        <div style="display:flex;gap:14px;padding:12px;border-bottom:1px solid var(--border);align-items:flex-start;">
+          <div style="background:#1e293b;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;">📡</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-weight:600;color:#fff;">${ev.action.description}</span>
+              <span style="font-size:11px;color:var(--text-dim);">${new Date(ev.timestamp).toLocaleTimeString()}</span>
+            </div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px;">
+              Actor: <b>${ev.actor.name}</b> | Event: <span style="font-family:monospace;color:#93c5fd">${ev.event_type}</span> | CRM Sync: <b style="color:#34d399">${ev.crm_sync_status}</b>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      container.innerHTML = `
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Unified Activity & Execution Center</div>
+            <div style="font-size:12px;color:var(--text-dim);">Real-time stream of platform operations, CRM events, and AI executions</div>
+          </div>
+        </div>
+        <div class="chart-panel" style="padding:0;">
+          ${feedHtml || '<div style="padding:20px;color:var(--text-muted)">No operational events yet.</div>'}
+        </div>
+      `;
+    }
+
+    // --- TAB 7: CRM SYNC HEALTH ---
+    async function renderCRMSync() {
+      const container = $('main-content');
+      const res = await apiRequest('/integrations/crm/health');
+      const data = await res.json();
+
+      container.innerHTML = `
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">CRM Bidirectional Synchronization Engine</div>
+            <div style="font-size:12px;color:var(--text-dim);">Transactional Outbox, Webhook Idempotency, and Conflict Detection</div>
+          </div>
+        </div>
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <div class="kpi-title">Sync Health</div>
+            <div class="kpi-value" style="color:#34d399">${data.status}</div>
+            <div class="kpi-sub">Bidirectional API Adapter</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Pending Outbox Events</div>
+            <div class="kpi-value">${data.pending_outbox_events}</div>
+            <div class="kpi-sub">Transactional Queue</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Failed Outbox Events</div>
+            <div class="kpi-value" style="color:${data.failed_outbox_events > 0 ? '#f87171' : 'inherit'}">${data.failed_outbox_events}</div>
+            <div class="kpi-sub">Automatic Retry Queue</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-title">Unresolved Conflicts</div>
+            <div class="kpi-value">${data.unresolved_conflicts}</div>
+            <div class="kpi-sub">Field Ownership Rules</div>
+          </div>
+        </div>
+        <button class="btn btn-primary" onclick="triggerProcessOutbox()">⚡ Process Outbox Queue Now</button>
+      `;
+    }
+
+    async function triggerProcessOutbox() {
+      const res = await apiRequest('/integrations/crm/outbox/process', { method: 'POST' });
+      const data = await res.json();
+      alert(`Outbox processed: ${data.processed_events} events pushed to CRM.`);
+      renderCRMSync();
+    }
+
+    // --- TAB 8: SECURITY & AUDIT LOGS ---
+    async function renderAuditSecurity() {
+      const container = $('main-content');
+      const res = await apiRequest('/audit-logs?limit=25');
+      const logs = await res.json();
+
+      let logRows = logs.map(a => `
+        <tr>
+          <td>${a.id}</td>
+          <td>${new Date(a.ts).toLocaleString()}</td>
+          <td><span class="badge badge-success">${a.action}</span></td>
+          <td>${a.resource}</td>
+          <td><b style="color:${a.result === 'SUCCESS' ? '#34d399' : '#f87171'}">${a.result}</b></td>
+          <td style="font-family:monospace;font-size:11px;color:#94a3b8;">${a.hash.substring(0, 16)}...</td>
+        </tr>
+      `).join('');
+
+      container.innerHTML = `
+        <div class="panel-header">
+          <div>
+            <div class="panel-title">Tamper-Evident Hash-Chained Audit Engine</div>
+            <div style="font-size:12px;color:var(--text-dim);">Append-only audit trail with SHA-256 cryptographic chaining (Zero customer PII)</div>
+          </div>
+          <button class="btn btn-primary" onclick="verifyAuditIntegrity()">🔒 Verify Hash Chain</button>
+        </div>
+        <div id="audit-verify-status" style="margin-bottom:12px;"></div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Timestamp</th><th>Action</th><th>Resource</th><th>Result</th><th>Cryptographic Hash</th></tr>
+            </thead>
+            <tbody>${logRows}</tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    async function verifyAuditIntegrity() {
+      const res = await apiRequest('/audit-logs/verify');
+      const data = await res.json();
+      const statusArea = $('audit-verify-status');
+      if (statusArea) {
+        statusArea.innerHTML = `
+          <div style="padding:10px 14px;border-radius:6px;background:${data.intact ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'};border:1px solid ${data.intact ? '#10b981' : '#ef4444'};color:${data.intact ? '#34d399' : '#f87171'};font-size:13px;font-weight:600;">
+            ✓ ${data.status}
+          </div>
+        `;
+      } else {
+        alert(data.status);
+      }
+    }
+
+    // --- AI ASSISTANT PANEL ---
+    function toggleAIDrawer() {
+      $('ai-drawer').classList.toggle('open');
+    }
+
+    function triggerAIQuickPrompt(promptText) {
+      $('ai-drawer').classList.add('open');
+      $('ai-input').value = promptText;
+      sendAIMessage();
+    }
+
+    async function sendAIMessage() {
+      const input = $('ai-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      const messagesDiv = $('ai-messages');
+      // Append user bubble
+      const userBubble = document.createElement('div');
+      userBubble.className = 'chat-bubble user';
+      userBubble.textContent = msg;
+      messagesDiv.appendChild(userBubble);
+      input.value = '';
+
+      // Append thinking agent bubble
+      const agentBubble = document.createElement('div');
+      agentBubble.className = 'chat-bubble agent';
+      agentBubble.textContent = 'Analyzing request through Master Orchestrator...';
+      messagesDiv.appendChild(agentBubble);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      try {
+        const res = await apiRequest('/agents/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg, context_filters: globalFilters })
+        });
+        const data = await res.json();
+
+        let evidenceHtml = '';
+        if (data.evidence && data.evidence.length > 0) {
+          evidenceHtml = data.evidence.map(ev => `
+            <div class="ai-evidence">
+              <b>${ev.title}</b>
+              <ul style="margin:4px 0 0 16px;color:#cbd5e1;">
+                ${ev.data_points.map(p => `<li>${p}</li>`).join('')}
+              </ul>
+            </div>
+          `).join('');
+        }
+
+        let actionHtml = '';
+        if (data.proposed_action) {
+          actionHtml = `
+            <div style="margin-top:10px;padding:8px;background:rgba(59,130,246,0.1);border:1px solid #3b82f6;border-radius:6px;">
+              <div style="font-weight:600;color:#93c5fd;">Consequential Action Proposed:</div>
+              <div style="font-size:12px;margin:4px 0;">${data.proposed_action.summary}</div>
+              <button class="btn btn-primary" style="padding:4px 10px;font-size:11px;margin-top:4px;" onclick="approveAgentAction('${data.execution_id}', '${data.proposed_action.action_type}', ${JSON.stringify(data.proposed_action.details).replace(/"/g, '&quot;')})">Authorize Action</button>
+            </div>
+          `;
+        }
+
+        agentBubble.innerHTML = `
+          <div style="font-weight:600;font-size:11px;color:#60a5fa;margin-bottom:4px;">${data.agent_name} (${data.intent.toUpperCase()})</div>
+          ${data.message}
+          ${evidenceHtml}
+          ${actionHtml}
+        `;
+      } catch (err) {
+        agentBubble.textContent = `Error: ${err.message}`;
+      }
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+
+    async function approveAgentAction(executionId, actionType, details) {
+      const res = await apiRequest('/agents/execute-action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          execution_id: executionId,
+          action_type: actionType,
+          approved: true,
+          payload: details
+        })
+      });
+      const data = await res.json();
+      alert(`Action successfully authorized and executed: ${data.status}`);
+      renderCurrentTab();
+    }
+
+    async function exportLeadsCSV() {
+      const q = globalFilters.region ? `?region=${globalFilters.region}` : '';
+      const res = await apiRequest(`/reports/export/leads.csv${q}`);
+      const blob = await res.blob();
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `leads_report_${globalFilters.region || 'all'}.csv`;
+      a.click();
+    }
+  </script>
+</body>
+</html>
