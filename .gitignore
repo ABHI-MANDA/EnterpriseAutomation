@@ -1,4 +1,12 @@
+# Dependencies
+node_modules/
+frontend/node_modules/
+
+# Next.js
+.next/
+frontend/.next/
+
+# Environment files
 .env
-*.db
-__pycache__/
-*.dump
+.env.local
+venv/
