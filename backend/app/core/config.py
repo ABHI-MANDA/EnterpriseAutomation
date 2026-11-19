@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
     SECRET_KEY: str = os.getenv("SECRET_KEY", "prod-secret-change-in-production-" + secrets.token_hex(16))
     CRM_WEBHOOK_SECRET: str = os.getenv("CRM_WEBHOOK_SECRET", "crm-webhook-secret-key-32chars-min!")
+    FIELD_ENCRYPTION_KEY: str = os.getenv("FIELD_ENCRYPTION_KEY", "aes-256-gcm-key-32bytes-secret-v1!!")
+    HMAC_LOOKUP_KEY: str = os.getenv("HMAC_LOOKUP_KEY", "hmac-lookup-key-32bytes-deterministic!!")
     
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./platform.db")

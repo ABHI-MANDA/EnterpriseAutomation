@@ -1,5 +1,8 @@
-"""Security, RBAC, ABAC, and Cryptographic Utilities."""
+"""Security, RBAC, ABAC, and Cryptographic Utilities.
+Includes AES-256-GCM Field-Level Encryption & HMAC-SHA-256 Deterministic Lookup.
+"""
 import os
+import re
 import hmac
 import hashlib
 import base64
@@ -12,6 +15,7 @@ import threading
 import jwt
 from fastapi import HTTPException, Request, Depends
 from sqlalchemy.orm import Session
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from backend.app.core.config import settings
 
 # RBAC Hierarchy & Scopes
@@ -29,6 +33,85 @@ PERMS = {
 
 def now_utc() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+# --- Cryptographic Utilities: AES-256-GCM & HMAC-SHA-256 ---
+
+def _get_aes_key() -> bytes:
+    """Derive 32-byte key from config for AES-256."""
+    raw = settings.FIELD_ENCRYPTION_KEY.encode("utf-8")
+    return hashlib.sha256(raw).digest()
+
+def _get_hmac_key() -> bytes:
+    """Derive 32-byte dedicated key for deterministic lookup."""
+    raw = settings.HMAC_LOOKUP_KEY.encode("utf-8")
+    return hashlib.sha256(raw).digest()
+
+def encrypt_aes_gcm(plaintext: str, key_version: str = "v1") -> str:
+    """Encrypt sensitive string using AES-256-GCM with 12-byte random IV.
+    Returns: v1:<nonce_b64>:<ciphertext_and_tag_b64>
+    """
+    if not plaintext:
+        return ""
+    key = _get_aes_key()
+    aesgcm = AESGCM(key)
+    nonce = os.urandom(12)
+    ciphertext = aesgcm.encrypt(nonce, plaintext.encode("utf-8"), None)
+    nonce_b64 = base64.b64encode(nonce).decode("ascii")
+    ct_b64 = base64.b64encode(ciphertext).decode("ascii")
+    return f"{key_version}:{nonce_b64}:{ct_b64}"
+
+def decrypt_aes_gcm(encrypted_str: str) -> str:
+    """Decrypt an AES-256-GCM encrypted string with authentication tag verification."""
+    if not encrypted_str:
+        return ""
+    try:
+        parts = encrypted_str.split(":")
+        if len(parts) == 3:
+            _, nonce_b64, ct_b64 = parts
+            nonce = base64.b64decode(nonce_b64)
+            ciphertext = base64.b64decode(ct_b64)
+            key = _get_aes_key()
+            aesgcm = AESGCM(key)
+            decrypted = aesgcm.decrypt(nonce, ciphertext, None)
+            return decrypted.decode("utf-8")
+        return encrypted_str
+    except Exception:
+        # Return masked or original if failed/unencrypted
+        return encrypted_str
+
+def compute_lookup_hmac(val: str) -> str:
+    """Deterministic HMAC-SHA-256 fingerprint for phone/email matching.
+    Never uses unsalted SHA-256. Uses a secret HMAC key distinct from AES key.
+    """
+    if not val:
+        return ""
+    clean = str(val).strip().lower()
+    key = _get_hmac_key()
+    return hmac.new(key, clean.encode("utf-8"), hashlib.sha256).hexdigest()
+
+# --- Normalization Utilities ---
+
+def normalize_indian_mobile(phone: str) -> str:
+    """Normalize Indian mobile numbers:
+    - Removes spaces, dashes, +91, 0 prefix
+    - Preserves clean 10-digit standard Indian format
+    """
+    if not phone:
+        return ""
+    clean = re.sub(r"[^\d]", "", str(phone))
+    if clean.startswith("91") and len(clean) == 12:
+        clean = clean[2:]
+    elif clean.startswith("0") and len(clean) == 11:
+        clean = clean[1:]
+    return clean
+
+def normalize_email(email: str) -> str:
+    """Normalize email address: trim whitespace and lowercase."""
+    if not email:
+        return ""
+    return str(email).strip().lower()
+
+# --- Password & MFA ---
 
 def hash_pw(pw: str, salt: str | None = None) -> str:
     salt = salt or secrets.token_hex(16)

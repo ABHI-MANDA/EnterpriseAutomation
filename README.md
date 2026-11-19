@@ -2,6 +2,8 @@
 
 A high-performance **AI-Powered Real Estate Enterprise Operations Command Center** designed for management to **Observe, Analyze, Decide, Execute, and Monitor** business operations across regions, projects, and sales teams from a unified interface.
 
+Built for **800,000+ lead records**, featuring **AES-256-GCM field encryption**, **HMAC-SHA-256 deterministic lookup**, **DPDP Act (2023) consent records**, **tamper-evident audit trails**, and **bidirectional CRM synchronization**.
+
 ---
 
 ## 🌟 Architectural Overview
@@ -12,12 +14,18 @@ flowchart TD
       Dashboard["Customizable Dashboard Grid"]
       Explorer["Universal Record Explorer"]
       CRMOps["CRM Operations & Allocation Center"]
+      ProductivityDash["Productivity & Performance Intelligence"]
+      DistributionDash["Lead Distribution & Workload Balancer"]
+      IngestionDash["Bulk Ingestion & Deduplication Center"]
+      IAMDash["IAM & Identity Governance"]
+      AccessibilityDash["Accessibility Intelligence"]
       AIAssistant["Master AI Agent Assistant (Drawer)"]
       ActivityTimeline["Live Activity Monitor (SSE)"]
     end
 
     subgraph Backend ["FastAPI Gateway & Security Layer"]
       Auth["PBKDF2 + TOTP MFA + JWT + RBAC/ABAC"]
+      Crypto["AES-256-GCM Encryption + HMAC-SHA-256 Lookup"]
       Audit["Tamper-Evident Hash-Chained Audit Engine"]
       SSEHub["Server-Sent Events (SSE) Broadcaster"]
     end
@@ -37,6 +45,7 @@ flowchart TD
       Postgres[("Central PostgreSQL (Logical Schemas + RLS)")]
       CRMAdapter["CRM Adapter (Transactional Outbox)"]
       ThirdPartyCRM["External Enterprise CRM"]
+      ConsentReg["DPDP Act (2023) Consent Register"]
     end
 
     UI <--> Backend
@@ -52,12 +61,15 @@ flowchart TD
 ## 🚀 Quick Run (No Docker)
 
 ### 1. Start Backend API & Command Center
+
 ```bash
-python -m uvicorn backend.app.main:app --port 8000 --reload
+.\venv\Scripts\python -m uvicorn backend.app.main:app --port 8000 --reload
 ```
+
 Open your browser at **http://localhost:8000**.
 
 ### 2. Pre-Seeded Synthetic Accounts (Password: `AdminPass@2026`)
+
 | Role | Email | Scope |
 | :--- | :--- | :--- |
 | **Super Admin** | `admin@demo.local` | Full platform & audit visibility, unmasked PII |
@@ -74,44 +86,32 @@ Open your browser at **http://localhost:8000**.
 cp .env.example .env
 docker compose up --build
 ```
+
 Access the reverse proxy at **http://localhost** (port 80).
 
 ---
 
 ## 🧪 Automated Quality Assurance & Tests
 
-Run the full automated test suite covering PBKDF2 authentication, JWT tokens, cryptographic audit chain integrity, executive overview calculations, server-side paginated record explorer, regional ABAC scoping, workload optimization heuristic allocation, idempotency, and AI orchestrator intent classification:
+Run the full automated test suite covering PBKDF2 authentication, JWT tokens, cryptographic audit chain integrity, executive overview calculations, server-side paginated record explorer, regional ABAC scoping, workload optimization heuristic allocation, idempotency, AI orchestrator intent classification, AES-256-GCM encryption, HMAC deterministic lookup, bulk ingestion, and DPDP Act consent:
 
 ```bash
-python -m pytest backend/tests/test_platform.py -v
+$env:PYTHONPATH="."; .\venv\Scripts\pytest backend\tests -v
 ```
 
 ---
 
-## 🔑 Key Features Implemented
+## 🔑 Key Enterprise Modules Implemented
 
-1. **Observe**:
-   - Executive Overview with live active leads, active projects, pipeline valuation, closed revenue, conversion rates, and overdue tasks.
-   - Universal Filters Bar synchronizing Region, Lead Stage, Priority, and Project across all widgets.
-2. **Analyze**:
-   - Sales Intelligence funnel and marketing channel breakdown.
-   - Project-wise conversion and regional comparison tables.
-   - Team capacity and task compliance meters with automated overload detection.
-3. **Decide**:
-   - Master AI Agent Orchestrator with 8 specialized agents:
-     1. Master Orchestrator (Intent classification, scope checking, tool routing)
-     2. Data Query Agent (Natural language to authorized database queries)
-     3. Business Insight Agent (Conversion bottlenecks & top project identification)
-     4. CRM Operations Agent (Task suggestions & lead status coordination)
-     5. Workload Optimization Agent (Lead allocation heuristics)
-     6. Monitoring Agent (Operational health & CRM sync status)
-     7. Reporting Agent (Periodic performance summaries)
-     8. Risk & Anomaly Agent (Disproportionate workload & access alerts)
-4. **Execute**:
-   - Lead Allocation Preview evaluating regional match, capacity, and luxury specialization.
-   - Manager Approval gate before dispatching assignments to CRM.
-   - Idempotent batch execution with per-record result tracking.
-5. **Monitor**:
-   - Live Activity Center with Server-Sent Events (SSE) streaming real-time operations.
-   - CRM Bidirectional Sync Engine with Transactional Outbox, Inbound Webhook HMAC verification, and Conflict Detection.
-   - Tamper-Evident SHA-256 Hash-Chained Audit Logs with one-click cryptographic integrity verification.
+1. **Executive Overview**: Real-time leads, active projects, pipeline valuation ₹Cr, closed revenue, conversion rates, and overdue tasks.
+2. **Universal Record Explorer**: Server-side paginated queries across Customers, Leads, Projects, Units, and Tasks with role-aware data masking.
+3. **CRM Operations & Intelligent Allocation**: Direct lead assignment, preview workflows, explainable AI allocation heuristics, and CRM API sync.
+4. **Sales Intelligence**: Pipeline stage funnels, marketing acquisition channels, and project-wise conversion rates.
+5. **Productivity & Performance Intelligence**: Task completion rate (%), lead response time (hrs), follow-up compliance (%), resolution time (days), and composite productivity scores.
+6. **Distribution & Automated Workload Balancer**: Geographic distribution, channel breakdown, unassigned lead queue, overload flags, and automated 1-click rebalancing recommendations.
+7. **Bulk Ingestion & Deduplication Center (800k Records Scale)**: CSV/Excel landing zone, SHA-256 checksum verification, AES-256-GCM encryption, HMAC-SHA-256 deduplication, and candidate resolution queue.
+8. **IAM & Security Governance**: User directory, role/permission breakdown, MFA enrollment status, failed logins (7d), and locked accounts.
+9. **Accessibility Intelligence**: 24-hour access heatmaps, cross-region boundary breach alerts, and off-hour access detection.
+10. **Tamper-Evident Hash-Chained Audit Engine**: Cryptographic previous-hash chaining verifying log integrity.
+11. **Live Operations Monitor**: Real-time Server-Sent Events (SSE) stream broadcasting all system events.
+12. **Master AI Agent Assistant**: 8 specialized AI agents supporting natural-language data queries, business insights, workload balancing, and CRM operations.
