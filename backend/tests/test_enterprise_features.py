@@ -2,6 +2,8 @@
 import io
 import json
 import pytest
+from fastapi import UploadFile
+from openpyxl import Workbook
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 from backend.app.core.database import Base
@@ -16,6 +18,7 @@ from backend.app.models.crm import Customer, Lead, ConsentRecord, LeadAllocation
 from backend.app.models.ingestion import ImportBatch, DuplicateCandidate, DuplicateResolution, UnmatchedEntity
 from backend.app.services.seed_service import seed_database
 from backend.app.services.cleaning_engine import CleaningEngine
+from backend.app.api.v1.ingestion import upload_leads_file
 from backend.app.services.record_service import query_records_paginated
 from backend.app.services.analytics_service import (
     get_iam_dashboard,
@@ -163,6 +166,64 @@ def test_cleaning_engine_standardization():
     # min_price and max_price swapped because 15,000,000 > 8,000,000
     assert clean["min_price"] == 8000000.0
     assert clean["max_price"] == 15000000.0
+
+def test_cleaning_engine_rejects_malformed_or_negative_prices():
+    malformed = CleaningEngine.clean_record({
+        "mobile": "9876543210",
+        "min_price": "not a price"
+    })
+    negative = CleaningEngine.clean_record({
+        "mobile": "9876543210",
+        "max_price": "-500"
+    })
+
+    assert malformed["is_valid"] is False
+    assert malformed["budget_valid"] is False
+    assert negative["is_valid"] is False
+    assert negative["budget_valid"] is False
+
+@pytest.mark.asyncio
+async def test_xlsx_upload_cleans_and_persists_valid_leads(enterprise_db):
+    admin = enterprise_db.scalar(select(User).where(User.role == "super_admin"))
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.append(["Customer Name", "Mobile Number", "Email ID", "City Name", "Locality Name", "Minimum Price", "Maximum Price"])
+    worksheet.append(["  Excel Import Client  ", "+91 98765 43219", " CLIENT@EXAMPLE.COM ", "Bangalore", "White Field", "₹8,000,000", 12000000])
+    content = io.BytesIO()
+    workbook.save(content)
+    workbook.close()
+    uploaded_file = UploadFile(filename="leads.xlsx", file=io.BytesIO(content.getvalue()))
+
+    response = await upload_leads_file(uploaded_file, admin, enterprise_db)
+
+    assert response["status"] == "success"
+    assert response["quality_report"]["successful_records"] == 1
+    customer = enterprise_db.scalar(select(Customer).where(Customer.phone == "9876543219"))
+    assert customer is not None
+    assert customer.name == "Excel Import Client"
+    assert customer.email == "client@example.com"
+    lead = enterprise_db.scalar(select(Lead).where(Lead.customer_id == customer.id))
+    assert lead.region == "Bengaluru"
+    assert lead.branch == "Whitefield"
+    assert lead.min_price == 8000000
+    assert lead.max_price == 12000000
+
+@pytest.mark.asyncio
+async def test_csv_upload_rejects_malformed_price_rows(enterprise_db):
+    admin = enterprise_db.scalar(select(User).where(User.role == "super_admin"))
+    csv_content = (
+        "name,mobile,min_price,max_price\n"
+        "Invalid Price Client,9876543218,not-a-price,10000000\n"
+    )
+    uploaded_file = UploadFile(filename="leads.csv", file=io.BytesIO(csv_content.encode("utf-8")))
+
+    response = await upload_leads_file(uploaded_file, admin, enterprise_db)
+
+    assert response["quality_report"]["valid_records"] == 0
+    assert response["quality_report"]["successful_records"] == 0
+    assert response["quality_report"]["rejected_records"] == 1
+    assert response["quality_report"]["invalid_budget_values"] == 1
+    assert enterprise_db.scalar(select(Customer).where(Customer.phone == "9876543218")) is None
 
 def test_lead_warehouse_schema_and_querying(enterprise_db):
     """Test querying warehouse leads with relational geographic and property attributes."""

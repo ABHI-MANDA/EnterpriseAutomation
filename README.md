@@ -1,3 +1,5 @@
+git 
+
 # Centralized Real Estate Intelligence & Operations Command Center
 
 A high-performance **AI-Powered Real Estate Enterprise Operations Command Center** designed for management to **Observe, Analyze, Decide, Execute, and Monitor** business operations across regions, projects, and sales teams from a unified interface.
@@ -110,6 +112,8 @@ $env:PYTHONPATH="."; .\venv\Scripts\pytest backend\tests -v
 5. **Productivity & Performance Intelligence**: Task completion rate (%), lead response time (hrs), follow-up compliance (%), resolution time (days), and composite productivity scores.
 6. **Distribution & Automated Workload Balancer**: Geographic distribution, channel breakdown, unassigned lead queue, overload flags, and automated 1-click rebalancing recommendations.
 7. **Bulk Ingestion & Deduplication Center (800k Records Scale)**: CSV/Excel landing zone, SHA-256 checksum verification, AES-256-GCM encryption, HMAC-SHA-256 deduplication, and candidate resolution queue.
+
+   The Record Explorer import panel accepts `.csv` and `.xlsx` files up to 20 MB and 50,000 data rows. Include a mobile/phone column; rows are normalized and checked for valid Indian mobile numbers, email addresses, and price ranges before valid records are stored. Invalid rows are rejected and duplicates are routed for review.
 8. **IAM & Security Governance**: User directory, role/permission breakdown, MFA enrollment status, failed logins (7d), and locked accounts.
 9. **Accessibility Intelligence**: 24-hour access heatmaps, cross-region boundary breach alerts, and off-hour access detection.
 10. **Tamper-Evident Hash-Chained Audit Engine**: Cryptographic previous-hash chaining verifying log integrity.

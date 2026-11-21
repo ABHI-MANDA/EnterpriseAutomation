@@ -9,6 +9,25 @@ export interface User {
   expertise: string;
 }
 
+export interface ImportUploadResult {
+  status: string;
+  batch_id: string;
+  filename: string;
+  checksum: string;
+  quality_report: {
+    total_imported_records: number;
+    valid_records: number;
+    successful_records: number;
+    duplicate_candidates: number;
+    rejected_records: number;
+    missing_mobile_numbers: number;
+    invalid_emails: number;
+    invalid_budget_values: number;
+    unmatched_locations: number;
+    data_completeness_pct: number;
+  };
+}
+
 export interface ExecutiveOverview {
   total_customers: number;
   total_leads: number;

@@ -1,3 +1,5 @@
+import type { ImportUploadResult, User } from '@/types';
+
 const API_BASE = '/api/v1';
 
 export async function fetchWithAuth(endpoint: string, token: string, options: RequestInit = {}) {
@@ -51,4 +53,33 @@ export async function askAIAgent(token: string, message: string, contextFilters?
     body: JSON.stringify({ message, context_filters: contextFilters })
   });
   return res.json();
+}
+
+export async function login(email: string, password: string, otp = ''): Promise<{ token: string; user: User }> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, otp })
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Unable to sign in.');
+  }
+  return data;
+}
+
+export async function uploadLeadFile(token: string, file: File): Promise<ImportUploadResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`${API_BASE}/ingestion/upload`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body: formData
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || 'Unable to process the uploaded file.');
+  }
+  return data;
 }

@@ -7,11 +7,15 @@ import io
 import csv
 import hashlib
 import json
+import re
+from zipfile import BadZipFile
 from typing import List, Optional, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
+from openpyxl import load_workbook
+from openpyxl.utils.exceptions import InvalidFileException
 from backend.app.core.database import get_db, SessionLocal
 from backend.app.core.security import (
     now_utc, ALL_SCOPE, encrypt_aes_gcm, compute_lookup_hmac,
@@ -27,6 +31,104 @@ from backend.app.services.cleaning_engine import CleaningEngine
 from backend.app.api.v1.auth import get_current_user
 
 router = APIRouter(prefix="/ingestion", tags=["Data Ingestion & Deduplication"])
+
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+MAX_IMPORT_ROWS = 50000
+MAX_IMPORT_COLUMNS = 100
+
+_HEADER_ALIASES = {
+    "name": {"name", "customername", "customer_name", "fullname"},
+    "mobile": {"mobile", "mobilenumber", "phone", "phonenumber", "contact", "contactnumber"},
+    "email": {"email", "emailid", "emailaddress"},
+    "city": {"city", "cityname", "region"},
+    "locality": {"locality", "localityname", "branch", "area"},
+    "property_type": {"propertytype"},
+    "min_price": {"minprice", "minimumprice"},
+    "max_price": {"maxprice", "maximumprice"},
+    "budget": {"budget"},
+    "source": {"source", "leadsource"},
+    "project_name": {"project", "projectname"},
+}
+_NORMALIZED_HEADERS = {
+    re.sub(r"[^a-z0-9]", "", alias.lower()): field
+    for field, aliases in _HEADER_ALIASES.items()
+    for alias in aliases
+}
+
+
+def _map_upload_headers(headers: List[Any]) -> List[Optional[str]]:
+    mapped = [
+        _NORMALIZED_HEADERS.get(re.sub(r"[^a-z0-9]", "", str(header or "").strip().lower()))
+        for header in headers
+    ]
+    recognized = [field for field in mapped if field]
+    if "mobile" not in recognized:
+        raise HTTPException(status_code=400, detail="File must include a mobile or phone number column.")
+    if len(recognized) != len(set(recognized)):
+        raise HTTPException(status_code=400, detail="File contains duplicate columns for the same field.")
+    return mapped
+
+
+def _build_upload_record(values: List[Any], headers: List[Optional[str]]) -> Dict[str, Any]:
+    if len(values) > len(headers):
+        raise HTTPException(status_code=400, detail="A row contains more values than the header row.")
+    row: Dict[str, Any] = {}
+    for index, field in enumerate(headers):
+        if field:
+            row[field] = values[index] if index < len(values) else None
+    return row
+
+
+def _parse_upload_file(filename: str, content: bytes) -> tuple[str, List[Dict[str, Any]]]:
+    extension = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    if extension not in ("csv", "xlsx"):
+        raise HTTPException(status_code=400, detail="Only .csv and .xlsx files are supported.")
+
+    records: List[Dict[str, Any]] = []
+    try:
+        if extension == "csv":
+            text = content.decode("utf-8-sig")
+            reader = csv.reader(io.StringIO(text, newline=""), strict=True)
+            raw_headers = next(reader, None)
+            if not raw_headers:
+                raise HTTPException(status_code=400, detail="File must contain a header row.")
+            if len(raw_headers) > MAX_IMPORT_COLUMNS:
+                raise HTTPException(status_code=400, detail=f"Files may contain at most {MAX_IMPORT_COLUMNS} columns.")
+            headers = _map_upload_headers(raw_headers)
+            for values in reader:
+                if not any(value is not None and str(value).strip() for value in values):
+                    continue
+                records.append(_build_upload_record(values, headers))
+                if len(records) > MAX_IMPORT_ROWS:
+                    raise HTTPException(status_code=413, detail=f"Files may contain at most {MAX_IMPORT_ROWS} data rows.")
+        else:
+            workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
+            try:
+                worksheet = workbook.active
+                rows = worksheet.iter_rows(values_only=True)
+                raw_headers = next(rows, None)
+                if not raw_headers:
+                    raise HTTPException(status_code=400, detail="File must contain a header row.")
+                if len(raw_headers) > MAX_IMPORT_COLUMNS:
+                    raise HTTPException(status_code=400, detail=f"Files may contain at most {MAX_IMPORT_COLUMNS} columns.")
+                headers = _map_upload_headers(list(raw_headers))
+                for values in rows:
+                    if not any(value is not None and str(value).strip() for value in values):
+                        continue
+                    records.append(_build_upload_record(list(values), headers))
+                    if len(records) > MAX_IMPORT_ROWS:
+                        raise HTTPException(status_code=413, detail=f"Files may contain at most {MAX_IMPORT_ROWS} data rows.")
+            finally:
+                workbook.close()
+    except HTTPException:
+        raise
+    except (UnicodeDecodeError, csv.Error, BadZipFile, InvalidFileException, KeyError, OSError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="Could not parse the uploaded file. Check its encoding and file format.") from exc
+
+    if not records:
+        raise HTTPException(status_code=400, detail="File must contain at least one data row.")
+    return extension.upper(), records
+
 
 class DuplicateResolutionRequest(BaseModel):
     candidate_id: str
@@ -67,33 +169,28 @@ async def upload_leads_file(
     if current_user.role not in ("super_admin", "admin", "management"):
         raise HTTPException(status_code=403, detail="Not authorized to ingest bulk enterprise data.")
 
-    content = await file.read()
+    filename = (file.filename or "").replace("\\", "/").rsplit("/", 1)[-1].strip()
+    if not filename or filename.rsplit(".", 1)[-1].lower() not in ("csv", "xlsx"):
+        raise HTTPException(status_code=400, detail="Only .csv and .xlsx files are supported.")
+
+    content = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded file exceeds the 20 MB limit.")
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
-    # Calculate SHA-256 Checksum
+    source_type, rows = _parse_upload_file(filename, content)
     file_checksum = hashlib.sha256(content).hexdigest()
 
-    # Create Batch Record
     batch = ImportBatch(
-        source_filename=file.filename or "uploaded_leads.csv",
-        source_type="CSV" if (file.filename and file.filename.endswith(".csv")) else "XLSX",
+        source_filename=filename[:255],
+        source_type=source_type,
         uploaded_by=current_user.id,
         file_checksum=file_checksum,
         batch_status="processing"
     )
     db.add(batch)
     db.flush()
-
-    # Parse CSV in streaming chunks
-    try:
-        text_stream = io.StringIO(content.decode("utf-8-sig", errors="replace"))
-        reader = csv.DictReader(text_stream)
-    except Exception as e:
-        batch.batch_status = "failed"
-        batch.error_summary = json.dumps([f"File parsing error: {str(e)}"])
-        db.commit()
-        raise HTTPException(status_code=400, detail="Could not parse file as valid CSV.")
 
     total_records = 0
     valid_records = 0
@@ -102,6 +199,7 @@ async def upload_leads_file(
     rejected_count = 0
     missing_mobile_count = 0
     invalid_email_count = 0
+    invalid_budget_count = 0
     unmatched_loc_count = 0
     errors = []
 
@@ -109,7 +207,8 @@ async def upload_leads_file(
     fallback_city = db.scalar(select(City).limit(1))
     fallback_prop_type = db.scalar(select(PropertyType).limit(1))
 
-    for row_idx, row in enumerate(reader, start=1):
+    source_label = f"{source_type} Import"
+    for row_idx, row in enumerate(rows, start=1):
         total_records += 1
         
         # 1. Clean and Standardize Record
@@ -122,6 +221,8 @@ async def upload_leads_file(
         
         if clean["raw_email"] and not clean["email_valid"]:
             invalid_email_count += 1
+        if not clean["budget_valid"]:
+            invalid_budget_count += 1
 
         if not clean["city_matched"] or not clean["locality_matched"]:
             unmatched_loc_count += 1
@@ -136,7 +237,16 @@ async def upload_leads_file(
 
         if not clean["is_valid"]:
             rejected_count += 1
-            errors.append(f"Row {row_idx}: Invalid mobile phone number or missing primary identifier.")
+            errors.append(f"Row {row_idx}: Invalid mobile, email, or price value.")
+            continue
+        if (
+            len(clean["name"]) > 120
+            or len(clean["email"]) > 200
+            or len(clean["city"]) > 40
+            or len(clean["locality"]) > 60
+        ):
+            rejected_count += 1
+            errors.append(f"Row {row_idx}: A value exceeds the maximum supported field length.")
             continue
 
         valid_records += 1
@@ -184,7 +294,7 @@ async def upload_leads_file(
                 email_lookup_hmac=email_hmac,
                 region=clean["city"],
                 branch=clean["locality"],
-                source=row.get("source") or "CSV Import"
+                source=str(row.get("source") or source_label).strip()[:50]
             )
             db.add(new_cust)
             db.flush()
@@ -200,7 +310,7 @@ async def upload_leads_file(
                 branch=clean["locality"],
                 status="new",
                 priority="normal",
-                source="CSV Import",
+                source=str(row.get("source") or source_label).strip()[:50],
                 budget=(clean["min_price"] + clean["max_price"]) / 2,
                 min_price=clean["min_price"],
                 max_price=clean["max_price"],
@@ -217,8 +327,10 @@ async def upload_leads_file(
         "valid_records": valid_records,
         "successful_records": successful_records,
         "duplicate_candidates": duplicate_count,
+        "rejected_records": rejected_count,
         "missing_mobile_numbers": missing_mobile_count,
         "invalid_emails": invalid_email_count,
+        "invalid_budget_values": invalid_budget_count,
         "unmatched_locations": unmatched_loc_count,
         "data_completeness_pct": round((valid_records / total_records * 100), 2) if total_records else 0.0
     }

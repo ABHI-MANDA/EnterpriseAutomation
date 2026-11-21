@@ -8,6 +8,7 @@ Handles:
 - Budget price range validation (min_price <= max_price)
 - Detailed Data Quality Reporting and unmatched value aggregation
 """
+import math
 import re
 from typing import Dict, Any, Tuple, List, Optional
 
@@ -137,7 +138,8 @@ class CleaningEngine:
         """
         if not raw_phone:
             return "", False
-        digits = re.sub(r"[^\d]", "", str(raw_phone))
+        phone_value = str(int(raw_phone)) if isinstance(raw_phone, float) and raw_phone.is_integer() else str(raw_phone)
+        digits = re.sub(r"[^\d]", "", phone_value)
         # Handle +91 or 91 country code prefix
         if digits.startswith("91") and len(digits) == 12:
             digits = digits[2:]
@@ -167,21 +169,27 @@ class CleaningEngine:
         max_p: Optional[Any],
         budget_fallback: float = 10000000.0
     ) -> Tuple[float, float, bool]:
-        """Validates min_price <= max_price. If inverted or single budget given, normalizes range."""
-        try:
-            min_val = float(min_p) if min_p is not None and str(min_p).strip() else None
-        except (ValueError, TypeError):
-            min_val = None
+        """Normalize price ranges while rejecting malformed or negative amounts."""
+        def parse_price(value: Optional[Any]) -> Tuple[Optional[float], bool]:
+            if value is None or not str(value).strip():
+                return None, True
+            try:
+                clean_value = str(value).strip().replace(",", "").replace("₹", "")
+                if clean_value[:3].lower() == "inr":
+                    clean_value = clean_value[3:].strip()
+                parsed = float(clean_value)
+                return parsed, math.isfinite(parsed) and parsed >= 0
+            except (ValueError, TypeError):
+                return None, False
 
-        try:
-            max_val = float(max_p) if max_p is not None and str(max_p).strip() else None
-        except (ValueError, TypeError):
-            max_val = None
+        min_val, min_valid = parse_price(min_p)
+        max_val, max_valid = parse_price(max_p)
+        if not min_valid or not max_valid:
+            return budget_fallback * 0.8, budget_fallback * 1.2, False
 
         if min_val is not None and max_val is not None:
             if min_val > max_val:
-                # Inverted: swap
-                return max_val, min_val, False
+                return max_val, min_val, True
             return min_val, max_val, True
         elif min_val is not None:
             return min_val, min_val * 1.3, True
@@ -214,7 +222,7 @@ class CleaningEngine:
         max_p = raw.get("max_price") or raw.get("Maximum Price") or raw.get("budget")
         std_min_p, std_max_p, budget_valid = cls.validate_budget_range(min_p, max_p)
 
-        is_valid = bool(phone_valid and (email_valid or not norm_email))
+        is_valid = bool(phone_valid and (email_valid or not norm_email) and budget_valid)
 
         return {
             "name": name,
