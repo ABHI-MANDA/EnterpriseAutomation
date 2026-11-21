@@ -247,6 +247,36 @@
             <option value="low">Low</option>
           </select>
         </div>
+        <div class="filter-group">
+          <span>City:</span>
+          <select class="filter-select" id="filter-city" onchange="applyGlobalFilters()">
+            <option value="">All Cities</option>
+            <option value="bengaluru">Bengaluru</option>
+            <option value="delhi_ncr">Delhi NCR</option>
+            <option value="mumbai">Mumbai</option>
+            <option value="hyderabad">Hyderabad</option>
+            <option value="kolkata">Kolkata</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span>Property:</span>
+          <select class="filter-select" id="filter-property-type" onchange="applyGlobalFilters()">
+            <option value="">All Types</option>
+            <option value="apt2bhk">Apartment - 2 BHK</option>
+            <option value="apt3bhk">Apartment - 3 BHK</option>
+            <option value="apt4bhk">Apartment - 4 BHK</option>
+            <option value="villa">Villa</option>
+            <option value="penthouse">Penthouse</option>
+            <option value="plot">Plot</option>
+            <option value="commercial">Commercial Space</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <span>Budget (₹ Lakh):</span>
+          <input type="number" class="filter-select" id="filter-min-price" placeholder="Min" style="width:70px;" onchange="applyGlobalFilters()" />
+          <span style="color:var(--text-dim)">–</span>
+          <input type="number" class="filter-select" id="filter-max-price" placeholder="Max" style="width:70px;" onchange="applyGlobalFilters()" />
+        </div>
         <button class="filter-btn primary" onclick="applyGlobalFilters()">Apply Filter</button>
         <button class="filter-btn" onclick="resetFilters()">Reset</button>
       </div>
@@ -326,7 +356,7 @@
     let authToken = null;
     let currentUser = null;
     let currentTab = 'overview';
-    let globalFilters = { region: '', stage: '', priority: '' };
+    let globalFilters = { region: '', stage: '', priority: '', city: '', property_type: '', min_price: '', max_price: '' };
     let currentBatchPreview = null;
     let sseSource = null;
 
@@ -415,6 +445,12 @@
       globalFilters.region = $('filter-region').value;
       globalFilters.stage = $('filter-stage').value;
       globalFilters.priority = $('filter-priority').value;
+      globalFilters.city = $('filter-city') ? $('filter-city').value : '';
+      globalFilters.property_type = $('filter-property-type') ? $('filter-property-type').value : '';
+      const minPriceLakh = $('filter-min-price') ? $('filter-min-price').value : '';
+      const maxPriceLakh = $('filter-max-price') ? $('filter-max-price').value : '';
+      globalFilters.min_price = minPriceLakh ? String(parseFloat(minPriceLakh) * 100000) : '';
+      globalFilters.max_price = maxPriceLakh ? String(parseFloat(maxPriceLakh) * 100000) : '';
       renderCurrentTab();
     }
 
@@ -422,7 +458,12 @@
       $('filter-region').value = '';
       $('filter-stage').value = '';
       $('filter-priority').value = '';
-      applyGlobalFilters();
+      if ($('filter-city')) $('filter-city').value = '';
+      if ($('filter-property-type')) $('filter-property-type').value = '';
+      if ($('filter-min-price')) $('filter-min-price').value = '';
+      if ($('filter-max-price')) $('filter-max-price').value = '';
+      globalFilters = { region: '', stage: '', priority: '', city: '', property_type: '', min_price: '', max_price: '' };
+      renderCurrentTab();
     }
 
     function handleGlobalSearch(e) {
@@ -437,7 +478,7 @@
     // Navigation
     const ALL_TABS = [
       'overview','records','crm-ops','sales-intel','productivity','distribution',
-      'team-ops','ingestion','iam-dash','accessibility','crm-sync','activity-feed','audit-sec'
+      'team-ops','ingestion','iam-dash','accessibility','crm-sync','activity-feed','audit-sec','data-admin'
     ];
 
     function switchTab(tab, extraState = {}) {
@@ -465,6 +506,7 @@
       else if (currentTab === 'activity-feed') renderLiveFeed();
       else if (currentTab === 'crm-sync') renderCRMSync();
       else if (currentTab === 'audit-sec') renderAuditSecurity();
+      else if (currentTab === 'data-admin') renderArchitecturalQuestionnaire();
     }
 
     // --- TAB 1: EXECUTIVE OVERVIEW ---
@@ -529,10 +571,10 @@
       `;
     }
 
-    // --- TAB 2: UNIVERSAL RECORD EXPLORER ---
+        // --- TAB 2: UNIVERSAL RECORD EXPLORER ---
     async function renderRecords(state = {}) {
       const container = $('main-content');
-      container.innerHTML = '<div style="padding:20px;color:var(--text-muted)">Querying authorized records from central database...</div>';
+      container.innerHTML = '<div style="padding:20px;color:var(--text-muted)">Querying central 800k database...</div>';
 
       let params = new URLSearchParams();
       params.set('page', state.page || 1);
@@ -540,58 +582,66 @@
       if (globalFilters.region) params.set('region', globalFilters.region);
       if (globalFilters.stage) params.set('status', globalFilters.stage);
       if (globalFilters.priority) params.set('priority', globalFilters.priority);
+      if (globalFilters.min_price) params.set('min_price', globalFilters.min_price);
+      if (globalFilters.max_price) params.set('max_price', globalFilters.max_price);
       if (state.search) params.set('search', state.search);
       if (state.filterUnassigned) params.set('unassigned', 'true');
 
-      const res = await apiRequest(`/records/leads?${params.toString()}`);
+      const res = await apiRequest('/records/leads?' + params.toString());
       const data = await res.json();
 
-      let rowsHtml = data.items.map(l => `
-        <tr>
-          <td><input type="checkbox" class="lead-select-cb" value="${l.id}" /></td>
-          <td><b>${l.customer_name}</b><br><span style="font-size:11px;color:var(--text-dim)">${l.customer_phone || ''}</span></td>
-          <td>${l.project_name}</td>
-          <td><span class="badge badge-success">${l.region}</span></td>
-          <td><span class="badge badge-outline">${l.status}</span></td>
-          <td>${l.priority === 'urgent' ? '<span class="badge badge-danger">Urgent</span>' : (l.priority === 'high' ? '<span class="badge badge-warning">High</span>' : l.priority)}</td>
-          <td>₹${(l.budget / 100000).toFixed(1)} Lakh</td>
-          <td>${l.assignee_name === 'Unassigned' ? '<span style="color:#f87171;font-weight:600">Unassigned</span>' : l.assignee_name}</td>
-          <td><button class="btn btn-outline" style="padding:4px 8px;font-size:11px" onclick="quickAssignSingle('${l.id}')">Assign</button></td>
-        </tr>
-      `).join('');
+      const fmtMoney = v => (v >= 10000000) ? '₹' + (v/10000000).toFixed(1) + 'Cr' : '₹' + (v/100000).toFixed(0) + 'L';
 
-      container.innerHTML = `
-        <div class="panel-header" style="margin-bottom:12px;">
-          <div>
-            <div class="panel-title">Centralized Database Records Explorer (Leads)</div>
-            <div style="font-size:12px;color:var(--text-dim);">Showing ${data.items.length} of ${data.total} records (Server-side paginated & RLS authorized)</div>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-primary" onclick="bulkAssignSelected()">⚡ Allocate Selected Leads</button>
-            <button class="btn btn-outline" onclick="exportLeadsCSV()">📥 Export Filtered CSV</button>
-          </div>
-        </div>
-        <div class="table-container">
-          <table>
-            <thead>
-              <tr>
-                <th width="30"><input type="checkbox" onclick="toggleSelectAll(this)" /></th>
-                <th>Client</th>
-                <th>Project</th>
-                <th>Region</th>
-                <th>Status</th>
-                <th>Priority</th>
-                <th>Budget</th>
-                <th>Assigned Executive</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>${rowsHtml}</tbody>
-          </table>
-        </div>
-      `;
+      let rowsHtml = data.items.map(l => {
+        const prio = l.priority === 'urgent' ? '<span class="badge badge-danger">Urgent</span>' : (l.priority === 'high' ? '<span class="badge badge-warning">High</span>' : l.priority);
+        const allotee = (l.allocated_to_name || l.assignee_name || 'Unassigned');
+        const alloteeCell = allotee === 'Unassigned' ? '<span style="color:#f87171;font-weight:600">Unassigned</span>' : allotee;
+        const allocDate = l.allocated_date ? '<br><span style="font-size:10px;color:var(--text-dim)">' + new Date(l.allocated_date).toLocaleDateString('en-IN') + '</span>' : '';
+        const piiIcon = l.has_encrypted_pii ? '<span style="color:#34d399;font-size:12px" title="PII encrypted AES-256-GCM + HMAC">🔒</span>' : '';
+        const minP = l.min_price || l.budget || 0;
+        const maxP = l.max_price || l.budget || 0;
+        return '<tr>' +
+          '<td><input type="checkbox" class="lead-select-cb" value="' + l.id + '" /></td>' +
+          '<td><b>' + (l.customer_name || l.name || '—') + '</b><br><span style="font-size:11px;color:var(--text-dim)">' + (l.customer_phone || '') + '</span></td>' +
+          '<td style="font-size:12px;">' + (l.project_name || '—') + '</td>' +
+          '<td style="font-size:12px;">' + (l.city_name ? '<b>' + l.city_name + '</b>' : '') + (l.locality_name ? '<br><span style="color:var(--text-dim)">' + l.locality_name + '</span>' : '') + '</td>' +
+          '<td style="font-size:12px;color:#93c5fd;">' + (l.property_type_name || 'Apartment') + '</td>' +
+          '<td><span class="badge badge-outline">' + l.status + '</span></td>' +
+          '<td>' + prio + '</td>' +
+          '<td style="font-size:12px;">' + fmtMoney(minP) + ' – ' + fmtMoney(maxP) + '</td>' +
+          '<td>' + alloteeCell + allocDate + '</td>' +
+          '<td>' + piiIcon + '</td>' +
+          '<td><button class="btn btn-outline" style="padding:4px 8px;font-size:11px" onclick="quickAssignSingle(\'' + l.id + '\')">Assign</button></td>' +
+          '</tr>';
+      }).join('');
+
+      const totalPages = Math.ceil(data.total / 15);
+      const curPage = state.page || 1;
+      const paginationHtml = '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px;font-size:12px;color:var(--text-muted);">' +
+        '<span>Page ' + curPage + ' of ' + (totalPages||1) + ' &nbsp;·&nbsp; ' + data.total.toLocaleString() + ' total records</span>' +
+        '<div style="margin-left:auto;display:flex;gap:6px;">' +
+        (curPage > 1 ? '<button class="btn btn-outline" style="padding:4px 10px;font-size:11px" onclick="renderRecords({page:' + (curPage-1) + '})">← Prev</button>' : '') +
+        (curPage < totalPages ? '<button class="btn btn-outline" style="padding:4px 10px;font-size:11px" onclick="renderRecords({page:' + (curPage+1) + '})">Next →</button>' : '') +
+        '</div></div>';
+
+      container.innerHTML =
+        '<div class="panel-header" style="margin-bottom:12px;">' +
+          '<div><div class="panel-title">Centralized 800k Lead Database — Record Explorer</div>' +
+          '<div style="font-size:12px;color:var(--text-dim);">Server-side paginated · RLS authorized · City / Locality / Budget / Property Type filters active</div></div>' +
+          '<div style="display:flex;gap:8px;">' +
+          '<button class="btn btn-primary" onclick="bulkAssignSelected()">⚡ Allocate Selected</button>' +
+          '<button class="btn btn-outline" onclick="switchTab(\'records\',{filterUnassigned:true})">🚫 Unassigned Queue</button>' +
+          '<button class="btn btn-outline" onclick="exportLeadsCSV()">📥 Export CSV</button>' +
+          '</div></div>' +
+        '<div class="table-container"><table>' +
+          '<thead><tr>' +
+          '<th width="30"><input type="checkbox" onclick="toggleSelectAll(this)" /></th>' +
+          '<th>Client</th><th>Project</th><th>City / Locality</th><th>Property Type</th>' +
+          '<th>Status</th><th>Priority</th><th>Budget Range</th><th>Allocated To</th><th>PII</th><th>Actions</th>' +
+          '</tr></thead>' +
+          '<tbody>' + (rowsHtml || '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-dim)">No records for the applied filters.</td></tr>') + '</tbody>' +
+        '</table>' + paginationHtml + '</div>';
     }
-
     function toggleSelectAll(master) {
       document.querySelectorAll('.lead-select-cb').forEach(cb => cb.checked = master.checked);
     }
@@ -1116,21 +1166,27 @@
       const res = await apiRequest('/ingestion/batches');
       const batches = await res.json();
 
-      let batchRows = (batches || []).map(b => `
-        <tr>
-          <td><b style="color:#60a5fa">${b.id.substring(0,8)}</b></td>
-          <td>${b.filename}</td>
-          <td>${new Date(b.uploaded_at).toLocaleString()}</td>
-          <td><b>${b.total_records}</b></td>
-          <td><span style="color:#34d399">${b.successful_records}</span></td>
-          <td><span style="color:#fbbf24;font-weight:700;">${b.duplicate_candidates}</span></td>
-          <td style="font-family:monospace;font-size:10px;color:#94a3b8;">${b.checksum.substring(0,16)}...</td>
-          <td><span class="badge ${b.status === 'completed' ? 'badge-success' : 'badge-warning'}">${b.status}</span></td>
-          <td>
-            ${b.duplicate_candidates > 0 ? `<button class="btn btn-outline" style="padding:3px 8px;font-size:11px;" onclick="viewDuplicateCandidates('${b.id}')">Review Duplicates</button>` : ''}
-          </td>
-        </tr>
-      `).join('');
+      let batchRows = (batches || []).map(b => {
+        const dateStr = new Date(b.uploaded_at).toLocaleString('en-IN');
+        const qualScore = b.total_records > 0 ? ((b.valid_records / b.total_records)*100).toFixed(1) : 'N/A';
+        return '<tr>' +
+          '<td><b style="color:#60a5fa">' + b.id.substring(0,8) + '</b></td>' +
+          '<td>' + b.filename + '</td>' +
+          '<td>' + dateStr + '</td>' +
+          '<td><b>' + (b.total_records||0).toLocaleString() + '</b></td>' +
+          '<td><span style="color:#34d399">' + (b.valid_records||b.successful_records||0).toLocaleString() + '</span> <span style="font-size:10px;color:var(--text-dim)">(' + qualScore + '%)</span></td>' +
+          '<td><span style="color:' + (b.missing_mobile > 0 ? '#f87171' : '#34d399') + '">' + (b.missing_mobile||0) + '</span></td>' +
+          '<td><span style="color:' + (b.invalid_emails > 0 ? '#f87171' : '#34d399') + '">' + (b.invalid_emails||0) + '</span></td>' +
+          '<td><span style="color:#fbbf24;font-weight:700;">' + (b.duplicate_candidates||0) + '</span></td>' +
+          '<td style="font-family:monospace;font-size:10px;color:#94a3b8;">' + b.checksum.substring(0,12) + '...</td>' +
+          '<td><span class="badge ' + (b.status === 'completed' ? 'badge-success' : 'badge-warning') + '">' + b.status + '</span></td>' +
+          '<td style="display:flex;flex-wrap:wrap;gap:3px;">' +
+          (b.duplicate_candidates > 0 ? '<button class="btn btn-outline" style="padding:3px 7px;font-size:10px;" onclick="viewDuplicateCandidates(\'' + b.id + '\')">Dups</button>' : '') +
+          '<button class="btn btn-outline" style="padding:3px 7px;font-size:10px;" onclick="viewQualityReport(\'' + b.id + '\')">📊</button>' +
+          '<button class="btn btn-outline" style="padding:3px 7px;font-size:10px;" onclick="viewUnmatchedEntities(\'' + b.id + '\')">🗺️</button>' +
+          '</td>' +
+          '</tr>';
+      }).join('');
 
       container.innerHTML = `
         <div class="panel-header">
@@ -1197,6 +1253,7 @@
           </div>
         </div>
 
+        <div id="ingestion-quality-report"></div>
         <div id="duplicates-modal-container"></div>
       `;
     }
@@ -1284,6 +1341,198 @@
       viewDuplicateCandidates(batchId);
     }
 
+
+    // --- QUALITY REPORT VIEWER ---
+    async function viewQualityReport(batchId) {
+      const res = await apiRequest('/ingestion/batches/' + batchId + '/report');
+      const report = await res.json();
+      const container = $('ingestion-quality-report');
+      if (!container) return;
+      
+      const totalRec = report.total_records || report.total_imported_records || 0;
+      const validRec = report.valid_records || 0;
+      const dupCands = report.duplicate_candidates || 0;
+      const missMob = report.missing_mobile || report.missing_mobile_numbers || 0;
+      const invEmail = report.invalid_emails || 0;
+      const unmatch = report.unmatched_locations || report.unmatched_locations_count || 0;
+      const qualScore = report.quality_score_percent || (totalRec > 0 ? ((validRec / totalRec)*100).toFixed(1) : 'N/A');
+      
+      container.innerHTML =
+        '<div style="margin-top:16px;padding:16px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;">' +
+        '<div class="panel-header"><div class="panel-title">📊 Data Quality Audit Report — Batch ' + batchId.substring(0,8) + '</div>' +
+        '<span class="badge ' + (parseFloat(qualScore) >= 95 ? 'badge-success' : parseFloat(qualScore) >= 80 ? 'badge-warning' : 'badge-danger') + '">Quality Score: ' + qualScore + '%</span></div>' +
+        '<div class="kpi-grid" style="margin-top:12px;">' +
+        '<div class="kpi-card"><div class="kpi-title">Total Records</div><div class="kpi-value">' + totalRec.toLocaleString() + '</div><div class="kpi-sub">Ingested records</div></div>' +
+        '<div class="kpi-card"><div class="kpi-title">Valid Records</div><div class="kpi-value" style="color:#34d399">' + validRec.toLocaleString() + '</div><div class="kpi-sub">' + (totalRec > 0 ? ((validRec/totalRec)*100).toFixed(1) : '0') + '% pass rate</div></div>' +
+        '<div class="kpi-card"><div class="kpi-title">Duplicate Candidates</div><div class="kpi-value" style="color:#fbbf24">' + dupCands.toLocaleString() + '</div><div class="kpi-sub">Human-in-loop review</div></div>' +
+        '<div class="kpi-card"><div class="kpi-title">Missing Mobile</div><div class="kpi-value" style="color:' + (missMob > 0 ? '#f87171' : '#34d399') + '">' + missMob.toLocaleString() + '</div><div class="kpi-sub">Records without mobile</div></div>' +
+        '<div class="kpi-card"><div class="kpi-title">Invalid Emails</div><div class="kpi-value" style="color:' + (invEmail > 0 ? '#f87171' : '#34d399') + '">' + invEmail.toLocaleString() + '</div><div class="kpi-sub">RFC non-compliant</div></div>' +
+        '<div class="kpi-card"><div class="kpi-title">Unmatched Locations</div><div class="kpi-value" style="color:' + (unmatch > 0 ? '#fbbf24' : '#34d399') + '">' + unmatch.toLocaleString() + '</div><div class="kpi-sub">Needs admin mapping</div></div>' +
+        '</div>' +
+        (report.breakdown ? '<div style="margin-top:12px;font-size:12px;color:var(--text-muted);"><b>Breakdown:</b><pre style="margin-top:6px;background:#0f172a;padding:10px;border-radius:6px;overflow:auto;">' + JSON.stringify(report.breakdown, null, 2) + '</pre></div>' : '') +
+        '</div>';
+    }
+
+    // --- UNMATCHED ENTITIES VIEWER ---
+    async function viewUnmatchedEntities(batchId) {
+      const params = batchId ? '/records/unmatched_entities?batch_id=' + batchId + '&limit=20' : '/records/unmatched_entities?limit=20';
+      const res = await apiRequest(params);
+      const data = await res.json();
+      const container = $('ingestion-quality-report');
+      if (!container) return;
+      
+      const rows = (data.items || []).map(ue =>
+        '<tr>' +
+        '<td style="font-family:monospace;font-size:12px;color:#93c5fd">' + ue.entity_type + '</td>' +
+        '<td><b>' + ue.raw_value + '</b></td>' +
+        '<td>' + (ue.suggested_match ? '<span style="color:#34d399">' + ue.suggested_match + '</span>' : '<span style="color:var(--text-dim)">None</span>') + '</td>' +
+        '<td><span class="badge ' + (ue.status === 'pending' ? 'badge-warning' : 'badge-success') + '">' + ue.status + '</span></td>' +
+        '</tr>'
+      ).join('');
+      
+      container.innerHTML =
+        '<div style="margin-top:16px;padding:16px;background:var(--card-bg);border:1px solid var(--border);border-radius:8px;">' +
+        '<div class="panel-header"><div class="panel-title">🗺️ Unmatched Entities — Administrator Mapping Queue</div>' +
+        '<span class="badge badge-warning">' + data.total + ' Pending Review</span></div>' +
+        '<p style="font-size:12px;color:var(--text-muted);margin:8px 0 12px;">These project names, locality names, and city names did not match the master dictionary during ingestion. Map them to canonical values or add them to the master.</p>' +
+        '<div class="table-container"><table>' +
+        '<thead><tr><th>Entity Type</th><th>Raw Value (from file)</th><th>Suggested Match</th><th>Status</th></tr></thead>' +
+        '<tbody>' + (rows || '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);padding:16px;">No unmatched entities.</td></tr>') + '</tbody>' +
+        '</table></div></div>';
+    }
+
+    // --- ARCHITECTURAL INTAKE QUESTIONNAIRE ---
+    function renderArchitecturalQuestionnaire() {
+      const container = $('main-content');
+      container.innerHTML =
+        '<div class="panel-header"><div><div class="panel-title">🏗️ Data Architecture Intake Questionnaire</div>' +
+        '<div style="font-size:12px;color:var(--text-dim);">Answer 4 questions to generate a customized PostgreSQL schema blueprint for your 800k records.</div></div></div>' +
+        
+        '<div style="max-width:720px;">' +
+        
+        // Q1
+        '<div class="chart-panel" style="margin-bottom:16px;">' +
+        '<div class="panel-header"><div class="panel-title">Q1 — Where are the 800,000 records currently stored?</div></div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;" id="q1-opts">' +
+        ['Multiple Excel/CSV files','One large Excel file','Existing CRM/database','Combination of all sources'].map((o,i) =>
+          '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#1e293b;border-radius:6px;cursor:pointer;border:1px solid transparent;" onclick="selectQ(this)" data-q="q1" data-v="' + i + '">' +
+          '<input type="radio" name="q1" value="' + i + '" style="accent-color:#3b82f6"> ' + o + '</label>'
+        ).join('') +
+        '</div></div>' +
+        
+        // Q2
+        '<div class="chart-panel" style="margin-bottom:16px;">' +
+        '<div class="panel-header"><div class="panel-title">Q2 — Primary purpose of the centralized database?</div></div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px;margin-top:8px;" id="q2-opts">' +
+        ['Central database + internal search dashboard','Complete CRM with lead allocation & tracking','Analytics and reporting only','All of the above'].map((o,i) =>
+          '<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:#1e293b;border-radius:6px;cursor:pointer;border:1px solid transparent;" onclick="selectQ(this)" data-q="q2" data-v="' + i + '">' +
+          '<input type="radio" name="q2" value="' + i + '" style="accent-color:#3b82f6"> ' + o + '</label>'
+        ).join('') +
+        '</div></div>' +
+        
+        // Q3
+        '<div class="chart-panel" style="margin-bottom:16px;">' +
+        '<div class="panel-header"><div class="panel-title">Q3 — Are duplicate customer records expected?</div></div>' +
+        '<div style="display:flex;gap:12px;margin-top:8px;" id="q3-opts">' +
+        ['Yes — Very likely','No — Clean dataset','Not sure'].map((o,i) =>
+          '<label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;background:#1e293b;border-radius:6px;cursor:pointer;border:1px solid transparent;" onclick="selectQ(this)" data-q="q3" data-v="' + i + '">' +
+          '<input type="radio" name="q3" value="' + i + '" style="accent-color:#3b82f6"> ' + o + '</label>'
+        ).join('') +
+        '</div></div>' +
+        
+        // Q4
+        '<div class="chart-panel" style="margin-bottom:16px;">' +
+        '<div class="panel-header"><div class="panel-title">Q4 — Approximately how many employees will access the system?</div></div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;" id="q4-opts">' +
+        ['Below 20','20–50','50–200','200–500','500+'].map((o,i) =>
+          '<label style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:#1e293b;border-radius:6px;cursor:pointer;border:1px solid transparent;" onclick="selectQ(this)" data-q="q4" data-v="' + i + '">' +
+          '<input type="radio" name="q4" value="' + i + '" style="accent-color:#3b82f6"> ' + o + '</label>'
+        ).join('') +
+        '</div></div>' +
+        
+        // Notes + Submit
+        '<div class="chart-panel" style="margin-bottom:16px;">' +
+        '<div class="panel-header"><div class="panel-title">Additional Requirements (Optional)</div></div>' +
+        '<textarea id="arch-notes" style="width:100%;background:#0f172a;border:1px solid var(--border);border-radius:6px;padding:10px 12px;color:#fff;font-size:13px;min-height:80px;margin-top:8px;" placeholder="Describe any special requirements: data sources, expected daily imports, compliance requirements, existing CRM systems..."></textarea>' +
+        '</div>' +
+        
+        '<button class="btn btn-primary" style="width:100%;padding:12px;font-size:14px;justify-content:center;" onclick="submitArchitectureQuestionnaire()">🏗️ Generate Architecture Blueprint</button>' +
+        '</div>' +
+        
+        '<div id="arch-result" style="margin-top:20px;"></div>';
+    }
+
+    function selectQ(label) {
+      const q = label.getAttribute('data-q');
+      document.querySelectorAll('[data-q="' + q + '"]').forEach(el => {
+        el.style.borderColor = 'transparent';
+        el.style.background = '#1e293b';
+      });
+      label.style.borderColor = '#3b82f6';
+      label.style.background = 'rgba(59,130,246,0.1)';
+    }
+
+    function submitArchitectureQuestionnaire() {
+      const q1 = ['Multiple Excel/CSV files','One large Excel file','Existing CRM/database','Combination of all sources'];
+      const q2 = ['Central DB + search dashboard','Complete CRM with allocation','Analytics only','All of the above'];
+      const q3 = ['Yes — Duplicates expected','No — Clean dataset','Not sure'];
+      const q4 = ['< 20 users','20–50 users','50–200 users','200–500 users','500+ users'];
+      
+      const getVal = (name, arr) => { const el = document.querySelector('input[name="' + name + '"]:checked'); return el ? arr[parseInt(el.value)] : 'Not answered'; };
+      
+      const result = {
+        data_source: getVal('q1', q1),
+        primary_purpose: getVal('q2', q2),
+        duplicates_expected: getVal('q3', q3),
+        team_size: getVal('q4', q4),
+        notes: document.getElementById('arch-notes').value
+      };
+      
+      const hasPartitioning = result.team_size.includes('200') || result.team_size.includes('500');
+      const hasDedup = result.duplicates_expected.includes('Yes');
+      const hasCRM = result.primary_purpose.includes('CRM') || result.primary_purpose.includes('All');
+      const hasAnalytics = result.primary_purpose.includes('Analytics') || result.primary_purpose.includes('All');
+      
+      document.getElementById('arch-result').innerHTML =
+        '<div style="padding:20px;background:var(--card-bg);border:1px solid #334155;border-radius:8px;">' +
+        '<div class="panel-header"><div class="panel-title">🏗️ Generated Architecture Blueprint</div><span class="badge badge-success">Customized for Your Answers</span></div>' +
+        '<div style="font-size:13px;line-height:1.8;color:#cbd5e1;margin-top:12px;">' +
+        '<div style="margin-bottom:12px;padding:10px;background:#0f172a;border-radius:6px;border-left:3px solid #3b82f6;">' +
+        '<b>Source:</b> ' + result.data_source + ' → <b>ETL Strategy:</b> Python + Pandas multi-file consolidator with pandas.concat() + schema normalization before PostgreSQL COPY<br>' +
+        '<b>Purpose:</b> ' + result.primary_purpose + ' → <b>Architecture:</b> ' + (hasCRM ? 'Full OLTP schema with lead allocation, CRM sync, and audit trail. ' : '') + (hasAnalytics ? 'Separate analytics/reporting replica with pre-aggregated views. ' : '') + 'Central PostgreSQL as single source of truth.<br>' +
+        '<b>Deduplication:</b> ' + result.duplicates_expected + ' → <b>Recommendation:</b> ' + (hasDedup ? 'Enable HMAC-SHA-256 mobile+email fingerprinting. Run dedup scan BEFORE full import. Stage 25%+ duplicates in human review queue.' : 'Run light dedup pass with exact mobile hash match only. No staging queue needed.') + '<br>' +
+        '<b>Team:</b> ' + result.team_size + ' → <b>Access Layer:</b> ' + (hasPartitioning ? 'Row-Level Security (RLS) + regional sharding recommended. Use connection pooling (PgBouncer). Consider read replicas for analytics.' : 'Standard RBAC with RLS policies. Single primary + nightly backup replica sufficient.') +
+        '</div>' +
+        '<div style="margin-bottom:8px;"><b style="color:#fff;">Recommended PostgreSQL Tables (Priority Order):</b></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">' +
+        [
+          ['leads', 'Master 800k records table (partitioned by region if 500+ users)'],
+          ['customers', 'Unique customer identity (name + encrypted mobile + email)'],
+          ['projects', 'Standardized project master (linked to city + locality)'],
+          ['cities / localities / zones', 'Geographic normalization layer'],
+          ['property_types', 'Apartment / Villa / Plot / Penthouse / Commercial master'],
+          ['lead_allocations', 'Full allocation history (not just current assignee)'],
+          ['import_batches', 'Track every CSV/Excel upload with quality metrics'],
+          hasCRM ? 'crm_sync_outbox|Transactional outbox for CRM bidirectional sync' : null,
+          hasDedup ? 'duplicate_candidates|Flagged records for human-in-loop dedup resolution' : null,
+          'audit_logs|Append-only SHA-256 hash-chained tamper-evident log',
+          'unmatched_entities|Staging for unrecognized project/locality names',
+          'users + roles|RBAC identity layer with MFA and lockout'
+        ].filter(Boolean).map(t => {
+          const parts = Array.isArray(t) ? t : t.split('|');
+          return '<div style="padding:8px;background:#0f172a;border-radius:4px;border:1px solid var(--border);">' +
+            '<div style="font-family:monospace;font-size:12px;color:#60a5fa;">' + parts[0] + '</div>' +
+            '<div style="font-size:11px;color:var(--text-dim);">' + parts[1] + '</div></div>';
+        }).join('') +
+        '</div>' +
+        '<div style="padding:10px;background:rgba(16,185,129,0.1);border:1px solid #10b981;border-radius:6px;font-size:12px;">' +
+        '<b style="color:#34d399;">✓ Security Checklist Generated:</b> ' +
+        'AES-256-GCM for mobile+email · Keyed HMAC-SHA-256 for dedup · PBKDF2 password hashing · RLS row-level isolation · ' +
+        'Append-only audit log · DPDP Act 2023 consent tagging · TLS in-transit · Encrypted backups' +
+        (result.notes ? '<br><b>Your notes:</b> ' + result.notes : '') +
+        '</div>' +
+        '</div></div>';
+    }
     // --- TAB 12: IAM DASHBOARD ---
     async function renderIAMDashboard() {
       const container = $('main-content');

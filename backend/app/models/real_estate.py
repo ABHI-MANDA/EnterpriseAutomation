@@ -1,9 +1,18 @@
-"""Real Estate Domain Models: Projects, Properties, Units, Viewings."""
+"""Real Estate Domain Models: Projects, Properties, Units, Viewings, and PropertyTypes."""
 from datetime import datetime
 from sqlalchemy import String, Integer, Float, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from backend.app.core.database import Base
 from backend.app.models.base import generate_uuid, utc_now
+
+class PropertyType(Base):
+    """Property Type Master Table (Apartment, Villa, Plot, Penthouse, Commercial)."""
+    __tablename__ = "property_types"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    name: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    code: Mapped[str] = mapped_column(String(20), unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 class Project(Base):
     __tablename__ = "projects"
@@ -16,6 +25,9 @@ class Project(Base):
     project_type: Mapped[str] = mapped_column(String(40), default="Residential")  # Residential, Commercial, Mixed
     status: Mapped[str] = mapped_column(String(30), default="Active")  # Active, Planning, Completed
     total_units: Mapped[int] = mapped_column(Integer, default=0)
+    city_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("cities.id"), nullable=True, index=True)
+    locality_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("localities.id"), nullable=True, index=True)
+    zone_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("zones.id"), nullable=True, index=True)
     launch_date: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 

@@ -1,4 +1,4 @@
-"""CRM Models: Customers, Leads, Deals, Tasks, Follow-ups, Communications, Activities, and Consent."""
+"""CRM Models: Customers, Leads, Deals, Tasks, Follow-ups, Activities, Communications, Consent, and LeadAllocations."""
 from datetime import datetime
 from sqlalchemy import String, Integer, Float, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
@@ -27,22 +27,57 @@ class Customer(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 class Lead(Base):
+    """Central Master Leads Table for 800,000+ Records."""
     __tablename__ = "leads"
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
     customer_id: Mapped[str] = mapped_column(String(36), ForeignKey("customers.id"), index=True)
+    name: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
     project_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("projects.id"), nullable=True, index=True)
+    property_type_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("property_types.id"), nullable=True, index=True)
+    city_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("cities.id"), nullable=True, index=True)
+    locality_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("localities.id"), nullable=True, index=True)
+    zone_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("zones.id"), nullable=True, index=True)
     region: Mapped[str] = mapped_column(String(40), index=True)
     branch: Mapped[str] = mapped_column(String(60), default="")
     status: Mapped[str] = mapped_column(String(30), default="new", index=True)  # new, contacted, qualified, negotiation, won, lost
     priority: Mapped[str] = mapped_column(String(20), default="normal", index=True)  # urgent, high, normal, low
     source: Mapped[str] = mapped_column(String(50), default="Website", index=True)
+    
+    # Budget Range
     budget: Mapped[float] = mapped_column(Float, default=10000000.0)
+    min_price: Mapped[float] = mapped_column(Float, default=8000000.0, index=True)
+    max_price: Mapped[float] = mapped_column(Float, default=12000000.0, index=True)
+
+    # Allocation Details
     assignee_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    allocated_to: Mapped[str | None] = mapped_column(String(36), ForeignKey("users.id"), nullable=True, index=True)
+    allocated_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+
+    # Encrypted Sensitive PII & Keyed HMAC Lookups
+    mobile_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    email_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
+    mobile_lookup_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    email_lookup_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+
     crm_external_id: Mapped[str | None] = mapped_column(String(100), nullable=True, index=True)
     first_response_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, onupdate=utc_now)
+
+class LeadAllocation(Base):
+    """Historical Allocation and Reassignment Log."""
+    __tablename__ = "lead_allocations"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=generate_uuid)
+    lead_id: Mapped[str] = mapped_column(String(36), ForeignKey("leads.id"), index=True)
+    employee_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), index=True)
+    previous_employee_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    allocated_date: Mapped[datetime] = mapped_column(DateTime, default=utc_now, index=True)
+    allocated_by: Mapped[str] = mapped_column(String(36), index=True)
+    allocation_status: Mapped[str] = mapped_column(String(30), default="active")  # active, reassigned, completed
+    notes: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now)
 
 class Deal(Base):
     __tablename__ = "deals"

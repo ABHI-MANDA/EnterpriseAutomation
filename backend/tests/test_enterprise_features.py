@@ -1,5 +1,6 @@
 """Enterprise Security, Ingestion, DPDP Act, and Specialized Dashboards Tests."""
 import io
+import json
 import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
@@ -9,9 +10,13 @@ from backend.app.core.security import (
     normalize_indian_mobile, normalize_email
 )
 from backend.app.models.identity import User, Role, Permission, AccessLog
-from backend.app.models.crm import Customer, Lead, ConsentRecord
-from backend.app.models.ingestion import ImportBatch, DuplicateCandidate, DuplicateResolution
+from backend.app.models.organization import City, Zone, Locality
+from backend.app.models.real_estate import Project, PropertyType
+from backend.app.models.crm import Customer, Lead, ConsentRecord, LeadAllocation
+from backend.app.models.ingestion import ImportBatch, DuplicateCandidate, DuplicateResolution, UnmatchedEntity
 from backend.app.services.seed_service import seed_database
+from backend.app.services.cleaning_engine import CleaningEngine
+from backend.app.services.record_service import query_records_paginated
 from backend.app.services.analytics_service import (
     get_iam_dashboard,
     get_accessibility_dashboard,
@@ -130,3 +135,108 @@ def test_bulk_ingestion_and_deduplication(enterprise_db):
 
     reloaded = enterprise_db.get(DuplicateCandidate, candidate.id)
     assert reloaded.status == "merged"
+
+def test_cleaning_engine_standardization():
+    """Test CleaningEngine normalizes aliases, phones, emails, and swaps inverted budgets."""
+    raw_lead = {
+        "name": "  Vikramaditya Rao  ",
+        "mobile": "+91 (98450) 88899",
+        "email": "  VIKRAM.RAO@outlook.COM ",
+        "city": "Bangalore",
+        "locality": "White Field",
+        "property_type": "2bhk",
+        "min_price": "15000000",
+        "max_price": "8000000",
+        "project": "Godrej Splendour"
+    }
+
+    clean = CleaningEngine.clean_record(raw_lead)
+
+    assert clean["name"] == "Vikramaditya Rao"
+    assert clean["mobile"] == "9845088899"
+    assert clean["is_valid_phone"] is True
+    assert clean["email"] == "vikram.rao@outlook.com"
+    assert clean["is_valid_email"] is True
+    assert clean["city"] == "Bengaluru"
+    assert clean["locality"] == "Whitefield"
+    assert clean["property_type"] == "Apartment - 2 BHK"
+    # min_price and max_price swapped because 15,000,000 > 8,000,000
+    assert clean["min_price"] == 8000000.0
+    assert clean["max_price"] == 15000000.0
+
+def test_lead_warehouse_schema_and_querying(enterprise_db):
+    """Test querying warehouse leads with relational geographic and property attributes."""
+    admin_user = enterprise_db.scalar(select(User).where(User.role == "super_admin"))
+
+    # Query leads with price range filters
+    res = query_records_paginated(
+        db=enterprise_db,
+        module="leads",
+        page=1,
+        limit=10,
+        filters={"min_price": 5000000, "max_price": 25000000},
+        current_user=admin_user
+    )
+
+    assert res["total"] > 0
+    first_item = res["items"][0]
+    assert "city_name" in first_item
+    assert "locality_name" in first_item
+    assert "property_type_name" in first_item
+    assert "allocated_to_name" in first_item
+    assert "has_encrypted_pii" in first_item
+
+def test_lead_allocation_lifecycle(enterprise_db):
+    """Test lead allocation logging and multi-module query."""
+    lead = enterprise_db.scalar(select(Lead))
+    user = enterprise_db.scalar(select(User).where(User.role == "employee"))
+    admin = enterprise_db.scalar(select(User).where(User.role == "super_admin"))
+
+    assert user is not None
+    alloc = LeadAllocation(
+        lead_id=lead.id,
+        employee_id=user.id,
+        previous_employee_id=lead.allocated_to,
+        allocated_by=admin.id,
+        allocation_status="active",
+        notes="Automated round-robin assignment based on locality match"
+    )
+    enterprise_db.add(alloc)
+    enterprise_db.commit()
+
+    alloc_res = query_records_paginated(
+        db=enterprise_db,
+        module="lead_allocations",
+        page=1,
+        limit=10,
+        filters={"lead_id": lead.id},
+        current_user=admin
+    )
+    assert alloc_res["total"] >= 1
+    assert alloc_res["items"][0]["employee_id"] == user.id
+
+def test_import_batch_quality_report_and_unmatched_entities(enterprise_db):
+    """Test import batch quality counters and unmatched entities inspection."""
+    batch = enterprise_db.scalar(select(ImportBatch).order_by(ImportBatch.uploaded_at.desc()))
+    assert batch is not None
+    assert batch.valid_records >= 0
+    assert batch.missing_mobile >= 0
+    assert batch.invalid_emails >= 0
+    
+    # Check JSON quality report
+    report = json.loads(batch.quality_report_json)
+    assert "total_imported_records" in report or "total_records" in report
+    assert "valid_records" in report
+    assert "duplicate_candidates" in report
+
+    # Test querying unmatched_entities
+    admin = enterprise_db.scalar(select(User).where(User.role == "super_admin"))
+    unmatched_res = query_records_paginated(
+        db=enterprise_db,
+        module="unmatched_entities",
+        page=1,
+        limit=10,
+        current_user=admin
+    )
+    assert "items" in unmatched_res
+    assert unmatched_res["total"] >= 1

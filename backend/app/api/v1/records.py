@@ -24,6 +24,13 @@ def get_records(
     project_id: Optional[str] = Query(None),
     assignee_id: Optional[str] = Query(None),
     unassigned: Optional[bool] = Query(None),
+    city_id: Optional[str] = Query(None),
+    locality_id: Optional[str] = Query(None),
+    zone_id: Optional[str] = Query(None),
+    property_type_id: Optional[str] = Query(None),
+    min_price: Optional[float] = Query(None),
+    max_price: Optional[float] = Query(None),
+    allocated_to: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -42,6 +49,20 @@ def get_records(
         filters["assignee_id"] = assignee_id
     if unassigned is not None:
         filters["unassigned"] = unassigned
+    if city_id:
+        filters["city_id"] = city_id
+    if locality_id:
+        filters["locality_id"] = locality_id
+    if zone_id:
+        filters["zone_id"] = zone_id
+    if property_type_id:
+        filters["property_type_id"] = property_type_id
+    if min_price is not None:
+        filters["min_price"] = min_price
+    if max_price is not None:
+        filters["max_price"] = max_price
+    if allocated_to:
+        filters["allocated_to"] = allocated_to
 
     return query_records_paginated(
         db=db,

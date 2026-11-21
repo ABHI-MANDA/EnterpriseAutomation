@@ -70,13 +70,13 @@ Open your browser at **http://localhost:8000**.
 
 ### 2. Pre-Seeded Synthetic Accounts (Password: `AdminPass@2026`)
 
-| Role | Email | Scope |
-| :--- | :--- | :--- |
-| **Super Admin** | `admin@demo.local` | Full platform & audit visibility, unmasked PII |
-| **Management** | `mgmt@demo.local` | Enterprise portfolio, workload, and CRM approvals |
-| **Regional Manager** | `south.mgr@demo.local` | South Region operations (Bengaluru Hub) |
-| **Regional Manager** | `north.mgr@demo.local` | North Region operations (Delhi NCR) |
-| **Auditor** | `auditor@demo.local` | Read-only access to tamper-evident audit logs |
+| Role                       | Email                    | Scope                                             |
+| :------------------------- | :----------------------- | :------------------------------------------------ |
+| **Super Admin**      | `admin@demo.local`     | Full platform & audit visibility, unmasked PII    |
+| **Management**       | `mgmt@demo.local`      | Enterprise portfolio, workload, and CRM approvals |
+| **Regional Manager** | `south.mgr@demo.local` | South Region operations (Bengaluru Hub)           |
+| **Regional Manager** | `north.mgr@demo.local` | North Region operations (Delhi NCR)               |
+| **Auditor**          | `auditor@demo.local`   | Read-only access to tamper-evident audit logs     |
 
 ---
 
