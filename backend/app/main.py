@@ -12,6 +12,8 @@ from backend.app.services.seed_service import seed_database
 
 # Routers
 from backend.app.api.v1.auth import router as auth_router
+from backend.app.api.v1.users import router as users_router
+from backend.app.api.v1.crm_entities import router as crm_entities_router
 from backend.app.api.v1.analytics import router as analytics_router
 from backend.app.api.v1.records import router as records_router
 from backend.app.api.v1.crm_operations import router as crm_ops_router
@@ -21,6 +23,7 @@ from backend.app.api.v1.agents import router as agents_router
 from backend.app.api.v1.dashboards import router as dashboards_router
 from backend.app.api.v1.audit import router as audit_router
 from backend.app.api.v1.reports import router as reports_router
+from backend.app.api.v1.ingestion import router as ingestion_router
 
 def init_app_database():
     Base.metadata.create_all(bind=engine)
@@ -68,6 +71,8 @@ def health_check():
 # Register V1 API Routers
 v1_prefix = settings.API_V1_STR
 app.include_router(auth_router, prefix=v1_prefix)
+app.include_router(users_router, prefix=v1_prefix)
+app.include_router(crm_entities_router, prefix=v1_prefix)
 app.include_router(analytics_router, prefix=v1_prefix)
 app.include_router(records_router, prefix=v1_prefix)
 app.include_router(crm_ops_router, prefix=v1_prefix)
@@ -77,6 +82,7 @@ app.include_router(agents_router, prefix=v1_prefix)
 app.include_router(dashboards_router, prefix=v1_prefix)
 app.include_router(audit_router, prefix=v1_prefix)
 app.include_router(reports_router, prefix=v1_prefix)
+app.include_router(ingestion_router, prefix=v1_prefix)
 
 # Mount frontend directory if exists
 frontend_dir = os.environ.get("FRONTEND_DIR", os.path.join(os.path.dirname(__file__), "../../frontend"))
